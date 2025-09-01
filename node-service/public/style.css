@@ -1,0 +1,6 @@
+body { background: #111; color: #eee; font-family: Arial, sans-serif; }
+h1, h2 { color: crimson; }
+.container { max-width: 600px; margin: auto; }
+.panel { background: #222; padding: 15px; margin: 10px 0; border-radius: 6px; }
+button { background: crimson; color: white; border: none; padding: 8px 12px; margin: 5px; border-radius: 4px; cursor: pointer; }
+input, select { padding: 5px; margin: 5px; width: 95%; }
