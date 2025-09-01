@@ -1,1 +1,59 @@
-<!DOCTYPE html><html><body><h1>Jobs Page</h1></body></html>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Empire of Silence - Job History</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="common.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="sidebar">
+    <h2>Empire 🕶️</h2>
+    <a href="/">🏠 Home</a>
+    <a href="/crimes">💀 Crimes</a>
+    <a href="/jobs">📜 Jobs</a>
+    <a href="/login">🔑 Login</a>
+    <a href="/register">📝 Register</a>
+    <a id="adminLink" href="/admin" style="display:none;">👑 Admin</a>
+  </div>
+
+  <div class="content">
+    <h1>Job History</h1>
+    <div class="panel" id="jobs">Loading...</div>
+  </div>
+
+  <script>
+    async function loadJobs() {
+      if (!token) {
+        document.getElementById("jobs").innerHTML = "Login to see your job history.";
+        return;
+      }
+
+      const jobs = await apiGet("/jobs");
+
+      if (!jobs || jobs.length === 0) {
+        document.getElementById("jobs").innerHTML = "<p>No jobs yet. Go commit some crimes!</p>";
+        return;
+      }
+
+      let html = "<table><tr><th>Type</th><th>Result</th><th>Date</th></tr>";
+      jobs.forEach(j => {
+        html += `<tr>
+          <td>${j.type}</td>
+          <td>${j.result}</td>
+          <td>${new Date(j.created_at).toLocaleString()}</td>
+        </tr>`;
+      });
+      html += "</table>";
+      document.getElementById("jobs").innerHTML = html;
+    }
+
+    loadJobs();
+
+    // Show admin link if role is admin
+    if (role === "admin" || role === "mod") {
+      document.getElementById("adminLink").style.display = "block";
+    }
+  </script>
+</body>
+</html>
