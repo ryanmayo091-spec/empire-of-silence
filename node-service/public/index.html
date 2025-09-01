@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Empire of Silence</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #111; color: #eee; padding: 20px; }
+    h1 { color: crimson; }
+    button { margin: 5px; padding: 10px; }
+    input { padding: 5px; margin: 5px; }
+    .player, .job { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <h1>🕶️ Empire of Silence</h1>
+
+  <h2>Add Player</h2>
+  <input type="text" id="playerName" placeholder="Enter name">
+  <button onclick="addPlayer()">Add</button>
+
+  <h2>Players</h2>
+  <div id="players"></div>
+
+  <h2>Do a Job</h2>
+  <select id="jobType">
+    <option value="hit">Hit 💀</option>
+    <option value="smuggling">Smuggling 🚛</option>
+    <option value="bribe">Bribe 💵</option>
+  </select>
+  <input type="number" id="playerId" placeholder="Player ID">
+  <button onclick="doJob()">Run Job</button>
+
+  <h2>Recent Jobs</h2>
+  <div id="jobs"></div>
+
+  <script>
+    const API = window.location.origin;
+
+    async function fetchPlayers() {
+      const res = await fetch(API + "/players");
+      const data = await res.json();
+      document.getElementById("players").innerHTML = data.map(p => 
+        `<div class="player">#${p.id} ${p.name} | 💵 ${p.cash} | ⭐ ${p.respect} | 🔥 ${p.heat}</div>`
+      ).join("");
+    }
+
+    async function addPlayer() {
+      const name = document.getElementById("playerName").value;
+      const res = await fetch(API + "/players", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name })
+      });
+      await res.json();
+      fetchPlayers();
+    }
+
+    async function doJob() {
+      const playerId = parseInt(document.getElementById("playerId").value);
+      const type = document.getElementById("jobType").value;
+      const res = await fetch(API + "/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playerId, type })
+      });
+      const data = await res.json();
+      alert(data.message);
+      fetchPlayers();
+      fetchJobs();
+    }
+
+    async function fetchJobs() {
+      const res = await fetch(API + "/jobs");
+      const data = await res.json();
+      document.getElementById("jobs").innerHTML = data.map(j => 
+        `<div class="job">[${j.type}] Player ${j.player_id} → ${j.result} (${j.created_at})</div>`
+      ).join("");
+    }
+
+    // Initial load
+    fetchPlayers();
+    fetchJobs();
+  </script>
+</body>
+</html>
