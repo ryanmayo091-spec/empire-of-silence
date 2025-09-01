@@ -1,85 +1,111 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>Empire of Silence</title>
-  <style>
-    body { font-family: Arial, sans-serif; background: #111; color: #eee; padding: 20px; }
-    h1 { color: crimson; }
-    button { margin: 5px; padding: 10px; }
-    input { padding: 5px; margin: 5px; }
-    .player, .job { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>🕶️ Empire of Silence</h1>
+  <div class="container">
+    <h1>🕶️ Empire of Silence</h1>
 
-  <h2>Add Player</h2>
-  <input type="text" id="playerName" placeholder="Enter name">
-  <button onclick="addPlayer()">Add</button>
+    <div class="panel">
+      <h2>Register</h2>
+      <input id="regUser" placeholder="Username">
+      <input id="regPass" type="password" placeholder="Password">
+      <button onclick="register()">Register</button>
+    </div>
 
-  <h2>Players</h2>
-  <div id="players"></div>
+    <div class="panel">
+      <h2>Login</h2>
+      <input id="logUser" placeholder="Username">
+      <input id="logPass" type="password" placeholder="Password">
+      <button onclick="login()">Login</button>
+    </div>
 
-  <h2>Do a Job</h2>
-  <select id="jobType">
-    <option value="hit">Hit 💀</option>
-    <option value="smuggling">Smuggling 🚛</option>
-    <option value="bribe">Bribe 💵</option>
-  </select>
-  <input type="number" id="playerId" placeholder="Player ID">
-  <button onclick="doJob()">Run Job</button>
+    <div class="panel">
+      <h2>Your Stats</h2>
+      <div id="stats">Login to see stats</div>
+    </div>
 
-  <h2>Recent Jobs</h2>
-  <div id="jobs"></div>
+    <div class="panel">
+      <h2>Crimes</h2>
+      <button onclick="doJob('hit')">Hit 💀</button>
+      <button onclick="doJob('smuggling')">Smuggling 🚛</button>
+      <button onclick="doJob('bribe')">Bribe 💵</button>
+    </div>
+
+    <div class="panel">
+      <h2>Recent Jobs</h2>
+      <div id="jobs"></div>
+    </div>
+  </div>
 
   <script>
     const API = window.location.origin;
+    let token = null;
 
-    async function fetchPlayers() {
-      const res = await fetch(API + "/players");
-      const data = await res.json();
-      document.getElementById("players").innerHTML = data.map(p => 
-        `<div class="player">#${p.id} ${p.name} | 💵 ${p.cash} | ⭐ ${p.respect} | 🔥 ${p.heat}</div>`
-      ).join("");
-    }
-
-    async function addPlayer() {
-      const name = document.getElementById("playerName").value;
-      const res = await fetch(API + "/players", {
+    async function register() {
+      const username = document.getElementById("regUser").value;
+      const password = document.getElementById("regPass").value;
+      const res = await fetch(API + "/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name })
+        body: JSON.stringify({ username, password })
       });
-      await res.json();
-      fetchPlayers();
+      const data = await res.json();
+      alert(data.message || data.error);
     }
 
-    async function doJob() {
-      const playerId = parseInt(document.getElementById("playerId").value);
-      const type = document.getElementById("jobType").value;
+    async function login() {
+      const username = document.getElementById("logUser").value;
+      const password = document.getElementById("logPass").value;
+      const res = await fetch(API + "/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (data.token) {
+        token = data.token;
+        alert("Login successful!");
+        fetchStats();
+        fetchJobs();
+      } else {
+        alert(data.error);
+      }
+    }
+
+    async function fetchStats() {
+      const res = await fetch(API + "/players/me", {
+        headers: { Authorization: "Bearer " + token }
+      });
+      const data = await res.json();
+      document.getElementById("stats").innerHTML =
+        `Name: ${data.name}<br>💵 Cash: ${data.cash}<br>⭐ Respect: ${data.respect}<br>🔥 Heat: ${data.heat}`;
+    }
+
+    async function doJob(type) {
+      if (!token) return alert("Login first");
       const res = await fetch(API + "/jobs", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId, type })
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ type })
       });
       const data = await res.json();
       alert(data.message);
-      fetchPlayers();
+      fetchStats();
       fetchJobs();
     }
 
     async function fetchJobs() {
-      const res = await fetch(API + "/jobs");
+      const res = await fetch(API + "/jobs", {
+        headers: { Authorization: "Bearer " + token }
+      });
       const data = await res.json();
-      document.getElementById("jobs").innerHTML = data.map(j => 
-        `<div class="job">[${j.type}] Player ${j.player_id} → ${j.result} (${j.created_at})</div>`
-      ).join("");
+      document.getElementById("jobs").innerHTML =
+        data.map(j => `<div>[${j.type}] → ${j.result} (${j.created_at})</div>`).join("");
     }
-
-    // Initial load
-    fetchPlayers();
-    fetchJobs();
   </script>
 </body>
 </html>
