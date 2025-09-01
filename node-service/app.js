@@ -29,10 +29,12 @@ const pool = new Pool({
   }
 })();
 
-// Root test route
+// Serve frontend at root
+const path = require("path");
 app.get("/", (req, res) => {
-  res.json({ message: "Empire of Silence is alive..." });
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
+
 
 // Add a new player
 app.post("/players", async (req, res) => {
