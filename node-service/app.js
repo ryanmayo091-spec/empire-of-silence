@@ -60,5 +60,33 @@ app.get("/players", async (req, res) => {
   }
 });
 
+// ✅ Auto-create tables if not exist
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS players (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        cash INT DEFAULT 1000,
+        respect INT DEFAULT 0,
+        heat INT DEFAULT 0
+      );
+
+      CREATE TABLE IF NOT EXISTS jobs (
+        id SERIAL PRIMARY KEY,
+        type TEXT NOT NULL,
+        player_id INT REFERENCES players(id),
+        status TEXT DEFAULT 'completed',
+        result TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+    console.log("✅ Tables ready");
+  } catch (err) {
+    console.error("❌ Error creating tables:", err);
+  }
+})();
+
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Empire of Silence running on port ${PORT}`));
