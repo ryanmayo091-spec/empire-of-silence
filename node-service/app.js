@@ -5,13 +5,13 @@ const { Pool } = require("pg");
 const app = express();
 app.use(bodyParser.json());
 
-// connect to DB
+// Connect to Postgres on Render
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false } // required for Render
+  ssl: { rejectUnauthorized: false }
 });
 
-// ✅ Auto-create table if not exists
+// ✅ Auto-create the players table if it doesn’t exist
 (async () => {
   try {
     await pool.query(`
@@ -29,12 +29,12 @@ const pool = new Pool({
   }
 })();
 
-// Test route
+// Root test route
 app.get("/", (req, res) => {
   res.json({ message: "Empire of Silence is alive..." });
 });
 
-// Add new player
+// Add a new player
 app.post("/players", async (req, res) => {
   const { name } = req.body;
   try {
