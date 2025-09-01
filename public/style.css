@@ -1,1 +1,131 @@
-body { background: #111; color: #eee; font-family: Arial; }
+/* Mafia Dark Theme */
+
+body {
+  background: url("assets/bg.jpg") no-repeat center center fixed;
+  background-size: cover;
+  color: #eee;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  margin: 0;
+}
+
+/* Sidebar */
+.sidebar {
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  width: 220px;
+  background: rgba(10, 0, 0, 0.95);
+  padding: 20px 0;
+  overflow-y: auto;
+  box-shadow: 3px 0 6px rgba(0,0,0,0.7);
+}
+
+.sidebar h2 {
+  color: crimson;
+  text-align: center;
+  font-family: 'Georgia', serif;
+  margin-bottom: 30px;
+  text-shadow: 0 0 6px darkred;
+}
+
+.sidebar a {
+  display: block;
+  color: #ccc;
+  padding: 12px 20px;
+  text-decoration: none;
+  font-size: 16px;
+  transition: 0.2s;
+}
+
+.sidebar a:hover {
+  background: crimson;
+  color: #fff;
+  text-shadow: 0 0 8px white;
+}
+
+/* Content */
+.content {
+  margin-left: 240px;
+  padding: 20px;
+}
+
+h1 {
+  color: #fff;
+  text-shadow: 0 0 8px crimson;
+}
+
+/* Panels */
+.panel {
+  background: rgba(30, 0, 0, 0.85);
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.6);
+  border: 1px solid crimson;
+}
+
+/* Buttons */
+button {
+  background: crimson;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin: 5px 0;
+  font-weight: bold;
+  transition: 0.2s;
+}
+
+button:hover {
+  background: darkred;
+  box-shadow: 0 0 8px crimson;
+}
+
+/* Inputs */
+input, select {
+  padding: 10px;
+  margin: 8px 0;
+  width: 100%;
+  border: none;
+  border-radius: 4px;
+  background: #222;
+  color: white;
+  font-size: 14px;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  color: white;
+}
+
+table th, table td {
+  border: 1px solid #444;
+  padding: 8px;
+  text-align: left;
+}
+
+table th {
+  background: #222;
+  color: crimson;
+}
+
+/* Prison highlight */
+.prison {
+  color: orange;
+  font-weight: bold;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #111;
+}
+::-webkit-scrollbar-thumb {
+  background: crimson;
+  border-radius: 4px;
+}
