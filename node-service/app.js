@@ -87,6 +87,84 @@ app.get("/players", async (req, res) => {
   }
 })();
 
+// Commit a crime (job)
+app.post("/jobs", async (req, res) => {
+  const { playerId, type } = req.body;
+
+  try {
+    // Check if player exists
+    const playerResult = await pool.query("SELECT * FROM players WHERE id = $1", [playerId]);
+    if (playerResult.rows.length === 0) {
+      return res.status(404).json({ error: "Player not found" });
+    }
+    let player = playerResult.rows[0];
+
+    // Job effects
+    let cashChange = 0;
+    let respectChange = 0;
+    let heatChange = 0;
+    let result = "";
+
+    switch (type) {
+      case "hit":
+        cashChange = -200; // cost of arranging a hit
+        respectChange = +5;
+        heatChange = +3;
+        result = "A rival was found floating in the river...";
+        break;
+
+      case "smuggling":
+        cashChange = +500; // profit
+        respectChange = +2;
+        heatChange = +4;
+        result = "Your smuggling run was successful!";
+        break;
+
+      case "bribe":
+        cashChange = -300;
+        respectChange = 0;
+        heatChange = -5; // lowers police heat
+        result = "The cops looked the other way this time...";
+        break;
+
+      default:
+        return res.status(400).json({ error: "Unknown job type" });
+    }
+
+    // Update player stats
+    await pool.query(
+      "UPDATE players SET cash = cash + $1, respect = respect + $2, heat = GREATEST(0, heat + $3) WHERE id = $4",
+      [cashChange, respectChange, heatChange, playerId]
+    );
+
+    // Insert job record
+    const jobResult = await pool.query(
+      "INSERT INTO jobs (type, player_id, result) VALUES ($1, $2, $3) RETURNING *",
+      [type, playerId, result]
+    );
+
+    res.json({
+      message: result,
+      playerUpdate: { cashChange, respectChange, heatChange },
+      job: jobResult.rows[0]
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Job failed" });
+  }
+});
+
+// List jobs
+app.get("/jobs", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM jobs ORDER BY created_at DESC LIMIT 20");
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch jobs" });
+  }
+});
+
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Empire of Silence running on port ${PORT}`));
