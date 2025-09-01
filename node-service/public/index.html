@@ -1,110 +1,49 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Empire of Silence</title>
+  <title>Empire of Silence - Dashboard</title>
   <link rel="stylesheet" href="style.css">
+  <script src="common.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-  <div class="container">
-    <h1>🕶️ Empire of Silence</h1>
+  <div class="sidebar">
+    <h2>Empire 🕶️</h2>
+    <a href="/">🏠 Home</a>
+    <a href="/crimes">💀 Crimes</a>
+    <a href="/jobs">📜 Jobs</a>
+    <a href="/login">🔑 Login</a>
+    <a href="/register">📝 Register</a>
+    <a id="adminLink" href="/admin" style="display:none;">👑 Admin</a>
+  </div>
 
-    <div class="panel">
-      <h2>Register</h2>
-      <input id="regUser" placeholder="Username">
-      <input id="regPass" type="password" placeholder="Password">
-      <button onclick="register()">Register</button>
-    </div>
-
-    <div class="panel">
-      <h2>Login</h2>
-      <input id="logUser" placeholder="Username">
-      <input id="logPass" type="password" placeholder="Password">
-      <button onclick="login()">Login</button>
-    </div>
-
-    <div class="panel">
-      <h2>Your Stats</h2>
-      <div id="stats">Login to see stats</div>
-    </div>
-
-    <div class="panel">
-      <h2>Crimes</h2>
-      <button onclick="doJob('hit')">Hit 💀</button>
-      <button onclick="doJob('smuggling')">Smuggling 🚛</button>
-      <button onclick="doJob('bribe')">Bribe 💵</button>
-    </div>
-
-    <div class="panel">
-      <h2>Recent Jobs</h2>
-      <div id="jobs"></div>
-    </div>
+  <div class="content">
+    <h1>Dashboard</h1>
+    <div class="panel" id="stats">Loading stats...</div>
   </div>
 
   <script>
-    const API = window.location.origin;
-    let token = null;
-
-    async function register() {
-      const username = document.getElementById("regUser").value;
-      const password = document.getElementById("regPass").value;
-      const res = await fetch(API + "/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
+    if (token) {
+      apiGet("/players/me").then(p => {
+        if (p && p.name) {
+          document.getElementById("stats").innerHTML = `
+            <strong>${p.name}</strong><br>
+            💵 Cash: $${p.cash}<br>
+            ⭐ Respect: ${p.respect}<br>
+            🔥 Heat: ${p.heat}<br>
+            ${p.in_prison_until ? "⛓️ In prison until: " + p.in_prison_until : ""}
+          `;
+        } else {
+          document.getElementById("stats").innerHTML = "Not logged in.";
+        }
       });
-      const data = await res.json();
-      alert(data.message || data.error);
+    } else {
+      document.getElementById("stats").innerHTML = "Not logged in.";
     }
 
-    async function login() {
-      const username = document.getElementById("logUser").value;
-      const password = document.getElementById("logPass").value;
-      const res = await fetch(API + "/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
-      });
-      const data = await res.json();
-      if (data.token) {
-        token = data.token;
-        alert("Login successful!");
-        fetchStats();
-        fetchJobs();
-      } else {
-        alert(data.error);
-      }
-    }
-
-    async function fetchStats() {
-      const res = await fetch(API + "/players/me", {
-        headers: { Authorization: "Bearer " + token }
-      });
-      const data = await res.json();
-      document.getElementById("stats").innerHTML =
-        `Name: ${data.name}<br>💵 Cash: ${data.cash}<br>⭐ Respect: ${data.respect}<br>🔥 Heat: ${data.heat}`;
-    }
-
-    async function doJob(type) {
-      if (!token) return alert("Login first");
-      const res = await fetch(API + "/jobs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-        body: JSON.stringify({ type })
-      });
-      const data = await res.json();
-      alert(data.message);
-      fetchStats();
-      fetchJobs();
-    }
-
-    async function fetchJobs() {
-      const res = await fetch(API + "/jobs", {
-        headers: { Authorization: "Bearer " + token }
-      });
-      const data = await res.json();
-      document.getElementById("jobs").innerHTML =
-        data.map(j => `<div>[${j.type}] → ${j.result} (${j.created_at})</div>`).join("");
+    // Show admin link if role is admin
+    if (role === "admin" || role === "mod") {
+      document.getElementById("adminLink").style.display = "block";
     }
   </script>
 </body>
