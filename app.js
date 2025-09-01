@@ -1,4 +1,3 @@
-
 // Empire of Silence Backend - Full Version
 // Node.js + Express + PostgreSQL
 
@@ -20,6 +19,9 @@ const pool = new Pool({
 
 const SECRET = process.env.JWT_SECRET || "supersecret";
 
+// ============================
+// Database Auto-Seeding
+// ============================
 (async () => {
   try {
     await pool.query(`
@@ -81,6 +83,9 @@ const SECRET = process.env.JWT_SECRET || "supersecret";
   }
 })();
 
+// ============================
+// Middleware
+// ============================
 function authMiddleware(req, res, next) {
   const authHeader = req.headers["authorization"];
   if (!authHeader) return res.status(401).json({ error: "No token" });
@@ -101,7 +106,9 @@ function adminMiddleware(req, res, next) {
   next();
 }
 
-// Auth routes
+// ============================
+// Auth Routes
+// ============================
 app.post("/auth/register", async (req, res) => {
   const { username, password } = req.body;
   const hashed = await bcrypt.hash(password, 10);
@@ -150,7 +157,9 @@ app.post("/auth/login", async (req, res) => {
   res.json({ token, role: user.role });
 });
 
-// Player
+// ============================
+// Player Routes
+// ============================
 app.get("/players/me", authMiddleware, async (req, res) => {
   const result = await pool.query(
     "SELECT * FROM players WHERE user_id = $1",
@@ -159,7 +168,9 @@ app.get("/players/me", authMiddleware, async (req, res) => {
   res.json(result.rows[0]);
 });
 
-// Crimes
+// ============================
+// Crimes + Jobs
+// ============================
 const crimeTypes = {
   hit: { cash: -200, respect: 5, heat: 3, jail: 300, successRate: 0.7 },
   smuggling: { cash: 500, respect: 2, heat: 4, jail: 180, successRate: 0.6 },
@@ -215,7 +226,9 @@ app.get("/jobs", authMiddleware, async (req, res) => {
   res.json(result.rows);
 });
 
-// Admin
+// ============================
+// Admin Routes
+// ============================
 app.get("/admin/players", authMiddleware, adminMiddleware, async (req, res) => {
   const result = await pool.query("SELECT * FROM players");
   res.json(result.rows);
@@ -245,6 +258,19 @@ app.post("/admin/role", authMiddleware, adminMiddleware, async (req, res) => {
   res.json({ message: "Role updated" });
 });
 
+// ============================
+// Serve Frontend Pages
+// ============================
+app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public/index.html")));
+app.get("/login", (req, res) => res.sendFile(path.join(__dirname, "public/login.html")));
+app.get("/register", (req, res) => res.sendFile(path.join(__dirname, "public/register.html")));
+app.get("/crimes", (req, res) => res.sendFile(path.join(__dirname, "public/crimes.html")));
+app.get("/jobs", (req, res) => res.sendFile(path.join(__dirname, "public/jobs.html")));
+app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public/admin.html")));
+
+// ============================
+// Server Start
+// ============================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
   console.log(`Empire of Silence backend running on port ${PORT}`)
