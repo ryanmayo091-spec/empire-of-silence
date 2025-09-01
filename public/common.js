@@ -1,0 +1,1 @@
+console.log('Empire of Silence frontend common.js loaded');
