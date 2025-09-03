@@ -27,12 +27,22 @@ function logout() {
   window.location = "/login";
 }
 
-// API helpers
+// ✅ Handle API responses properly
+async function handleResponse(res) {
+  const data = await res.json();
+  if (!res.ok) {
+    console.error("API Error:", data); // debug
+    throw data; // throw error so frontend can catch it
+  }
+  return data;
+}
+
+// ✅ API helpers with proper error handling
 async function apiGet(url) {
   const res = await fetch(API + url, {
     headers: { Authorization: "Bearer " + token }
   });
-  return await res.json();
+  return handleResponse(res);
 }
 
 async function apiPost(url, data) {
@@ -44,5 +54,5 @@ async function apiPost(url, data) {
     },
     body: JSON.stringify(data)
   });
-  return await res.json();
+  return handleResponse(res);
 }
