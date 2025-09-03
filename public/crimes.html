@@ -1,150 +1,143 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Empire of Silence - Crimes</title>
+  <meta charset="UTF-8">
+  <title>Crimes | Empire of Silence</title>
   <link rel="stylesheet" href="style.css">
   <script src="common.js"></script>
+  <style>
+    .crime-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+    .crime-card {
+      background: #2c2c2c;
+      border: 1px solid #444;
+      border-radius: 8px;
+      padding: 15px;
+      text-align: center;
+      transition: transform 0.2s, background 0.2s;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .crime-card:hover {
+      background: #383838;
+      transform: scale(1.02);
+    }
+    .crime-card.locked {
+      background: #1a1a1a;
+      color: #777;
+      border: 1px solid #333;
+      cursor: not-allowed;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 8px;
+      font-weight: bold;
+      display: none;
+    }
+  </style>
 </head>
 <body>
-  <div id="app"></div>
+  <div class="sidebar">
+    <h2>Empire</h2>
+    <a href="/">🏠 Home</a>
+    <a href="/crimes">💀 Crimes</a>
+    <a href="/jobs">📜 Jobs</a>
+    <a href="/prison">⛓ Prison</a>
+    <a href="/login" onclick="logout()">🚪 Logout</a>
+    <a href="/admin">⚖ Admin</a>
+  </div>
+
+  <div class="content">
+    <h1>Crimes</h1>
+    <p>Select a crime to commit. Locked crimes show their required rank.</p>
+
+    <div class="crime-list" id="crimeList"></div>
+
+    <div id="result"></div>
+  </div>
 
   <script>
-    if (!token) {
-      window.location = "/login";
-    } else {
-      document.getElementById("app").innerHTML = `
-        <div class="sidebar">
-          <h2>Empire</h2>
-          <a href="/">Home</a>
-          <a href="/crimes">Crimes</a>
-          <a href="/jobs">Jobs</a>
-          <a href="/prison">Prison</a>
-          <a href="#" onclick="logout()">Logout</a>
-          <a id="adminLink" href="/admin" style="display:none;">Admin</a>
-        </div>
+    const crimes = [
+      { id: "pickpocket", name: "Pickpocket", rank: "Street Rat" },
+      { id: "shoplift", name: "Shoplifting", rank: "Errand Boy" },
+      { id: "vandalism", name: "Vandalism", rank: "Associate" },
+      { id: "car_theft", name: "Car Theft", rank: "Muscle" },
+      { id: "smuggling", name: "Smuggling", rank: "Enforcer" },
+      { id: "kidnap", name: "Kidnap", rank: "Caporegime" },
+      { id: "blackmail", name: "Blackmail", rank: "Caporegime" },
+      { id: "drug_deal", name: "Drug Dealing", rank: "Underboss" },
+      { id: "hijack_truck", name: "Hijack Truck", rank: "Underboss" },
+      { id: "rob_bank", name: "Rob Bank", rank: "Consigliere" },
+      { id: "arms_deal", name: "Arms Deal", rank: "Consigliere" },
+      { id: "political_hit", name: "Political Hit", rank: "Boss" },
+      { id: "legendary_heist", name: "Legendary Heist", rank: "Godfather" }
+    ];
 
-        <div class="content">
-          <h1>Crimes</h1>
-          <div class="panel" id="crimePanel">Loading crimes...</div>
-          <div class="panel" id="result"></div>
-        </div>
-      `;
-
-      const crimeTypes = {
-        pickpocket:   { label: "Pickpocket",   minRank: "Street Rat" },
-        shoplift:     { label: "Shoplifting",  minRank: "Errand Boy" },
-        vandalism:    { label: "Vandalism",    minRank: "Associate" },
-        car_theft:    { label: "Car Theft",    minRank: "Muscle" },
-        smuggling:    { label: "Smuggling",    minRank: "Enforcer" },
-        kidnap:       { label: "Kidnap",       minRank: "Caporegime" },
-        blackmail:    { label: "Blackmail",    minRank: "Caporegime" },
-        drug_deal:    { label: "Drug Dealing", minRank: "Underboss" },
-        hijack_truck: { label: "Hijack Truck", minRank: "Underboss" },
-        rob_bank:     { label: "Rob Bank",     minRank: "Consigliere" },
-        arms_deal:    { label: "Arms Deal",    minRank: "Consigliere" },
-        political_hit:{ label: "Political Hit",minRank: "Boss" },
-        legendary_heist:{label: "Legendary Heist", minRank: "Godfather" }
-      };
-
-      const ranks = [
-        "Street Rat","Errand Boy","Associate","Muscle","Enforcer",
-        "Caporegime","Underboss","Consigliere","Boss","Godfather"
+    async function loadCrimes() {
+      const player = await apiGet("/players/me");
+      const rankOrder = [
+        "Street Rat","Errand Boy","Associate","Muscle",
+        "Enforcer","Caporegime","Underboss","Consigliere",
+        "Boss","Godfather"
       ];
+      const playerRankIndex = rankOrder.indexOf(player.rank);
 
-      apiGet("/players/me").then(p => {
-        buildCrimeButtons(p.rank);
+      const list = document.getElementById("crimeList");
+      list.innerHTML = "";
 
-        if (p.in_prison_until) {
-          startPrisonCountdown(new Date(p.in_prison_until).getTime(), p.cash);
-          lockCrimes();
+      crimes.forEach(c => {
+        const card = document.createElement("div");
+        card.className = "crime-card";
+        card.innerText = `${c.name}`;
+
+        const requiredIndex = rankOrder.indexOf(c.rank);
+        if (playerRankIndex < requiredIndex) {
+          card.classList.add("locked");
+          card.innerText = `${c.name} (${c.rank}+)`;
+        } else {
+          card.onclick = () => doCrime(c.id);
         }
-
-        if (role === "admin" || role === "mod") {
-          document.getElementById("adminLink").style.display = "block";
-        }
+        list.appendChild(card);
       });
+    }
 
-      function buildCrimeButtons(playerRank) {
-        let html = `<p>Select a crime to commit. Locked crimes show their required rank.</p>`;
-        Object.entries(crimeTypes).forEach(([key, crime]) => {
-          const isUnlocked = ranks.indexOf(playerRank) >= ranks.indexOf(crime.minRank);
-          html += `
-            <button class="crime-btn" id="btn-${key}" ${isUnlocked ? `onclick="doCrime('${key}')"` : "disabled"}
-              title="${isUnlocked ? "" : "Unlocks at " + crime.minRank}">
-              ${crime.label} ${isUnlocked ? "" : `(${crime.minRank}+)`}
-            </button><br>
-          `;
-        });
-        document.getElementById("crimePanel").innerHTML = html;
-      }
+    async function doCrime(type) {
+      const resultBox = document.getElementById("result");
+      resultBox.style.display = "block";
+      resultBox.innerText = "Processing...";
+      resultBox.className = "";
 
-      async function doCrime(type) {
+      try {
         const res = await apiPost("/crimes", { type });
-        if (res.error) {
-          document.getElementById("result").innerHTML = `<p class="crime-fail">${res.error}</p>`;
+        let msg = res.message;
+
+        // Style messages based on content
+        if (msg.includes("Success")) {
+          resultBox.className = "crime-success";
+        } else if (msg.includes("Failed")) {
+          resultBox.className = "crime-fail";
+        } else if (msg.includes("ranked")) {
+          resultBox.className = "crime-rankup";
+        } else if (msg.includes("Prestiged")) {
+          resultBox.className = "crime-prestige";
         } else {
-          let cssClass = "crime-info";
-          if (res.message.includes("Success")) cssClass = "crime-success";
-          else if (res.message.includes("Failed")) cssClass = "crime-fail";
-          else if (res.message.includes("ranked")) cssClass = "crime-rankup";
-          else if (res.message.includes("Prestiged")) cssClass = "crime-prestige";
-
-          document.getElementById("result").innerHTML = `<p class="${cssClass}">${res.message}</p>`;
-
-          if (res.message.includes("prison for")) {
-            lockCrimes();
-            const p = await apiGet("/players/me");
-            startPrisonCountdown(new Date(p.in_prison_until).getTime(), p.cash);
-          }
+          resultBox.className = "crime-info";
         }
-      }
 
-      function lockCrimes() {
-        document.querySelectorAll(".crime-btn").forEach(btn => {
-          btn.disabled = true;
-        });
-      }
-
-      function unlockCrimes() {
-        document.querySelectorAll(".crime-btn").forEach(btn => {
-          if (!btn.title.startsWith("Unlocks")) btn.disabled = false;
-        });
-      }
-
-      function startPrisonCountdown(prisonEnd, cash) {
-        const interval = setInterval(() => {
-          const now = Date.now();
-          const diff = prisonEnd - now;
-
-          if (diff <= 0) {
-            clearInterval(interval);
-            document.getElementById("result").innerHTML = `<p class="crime-success">You are free from prison.</p>`;
-            unlockCrimes();
-          } else {
-            const mins = Math.floor(diff / 60000);
-            const secs = Math.floor((diff % 60000) / 1000);
-            const bailCost = mins * 100;
-
-            document.getElementById("result").innerHTML = `
-              <p class="crime-fail">In prison for ${mins}m ${secs}s...</p>
-              <button onclick="payBail(${bailCost})" ${cash < bailCost ? "disabled" : ""}>
-                Pay Bail ($${bailCost})
-              </button>
-            `;
-          }
-        }, 1000);
-      }
-
-      async function payBail(cost) {
-        const res = await apiPost("/prison/bail", {});
-        if (res.error) {
-          alert(res.error);
-        } else {
-          alert(res.message);
-          location.reload();
-        }
+        resultBox.innerText = msg;
+      } catch (err) {
+        resultBox.style.display = "block";
+        resultBox.className = "crime-fail";
+        resultBox.innerText = err.error || "Error performing crime";
       }
     }
+
+    loadCrimes();
   </script>
 </body>
 </html>
