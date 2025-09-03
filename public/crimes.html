@@ -4,74 +4,85 @@
   <title>Empire of Silence - Crimes</title>
   <link rel="stylesheet" href="style.css">
   <script src="common.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-  <div class="sidebar">
-    <h2>Empire 🕶️</h2>
-    <a href="/">🏠 Home</a>
-    <a href="/crimes">💀 Crimes</a>
-    <a href="/jobs">📜 Jobs</a>
-    <a href="/login">🔑 Login</a>
-    <a href="/register">📝 Register</a>
-    <a id="adminLink" href="/admin" style="display:none;">👑 Admin</a>
-  </div>
-
-  <div class="content">
-    <h1>Crimes</h1>
-    <div class="panel">
-      <p>Select a crime to commit. Beware: failures may land you in prison! ⛓️</p>
-      <button id="btn-hit" onclick="doCrime('hit')">💀 Hit (High Risk)</button>
-      <button id="btn-smuggling" onclick="doCrime('smuggling')">🚛 Smuggling (Medium Risk)</button>
-      <button id="btn-bribe" onclick="doCrime('bribe')">💵 Bribe (Low Risk)</button>
-    </div>
-    <div class="panel" id="result"></div>
-  </div>
+  <div id="app"></div>
 
   <script>
-    const cooldowns = {
-      hit: 0,
-      smuggling: 0,
-      bribe: 0
-    };
+    if (!token) {
+      // Not logged in → send to login
+      window.location = "/login";
+    } else {
+      document.getElementById("app").innerHTML = `
+        <div class="sidebar">
+          <h2>Empire</h2>
+          <a href="/">🏠 Home</a>
+          <a href="/crimes">💀 Crimes</a>
+          <a href="/jobs">📜 Jobs</a>
+          <a href="#" onclick="logout()">🚪 Logout</a>
+          <a id="adminLink" href="/admin" style="display:none;">👑 Admin</a>
+        </div>
 
-    function updateCooldowns() {
-      const now = Date.now();
+        <div class="content">
+          <h1>Crimes</h1>
+          <div class="panel" id="crimePanel">Loading crimes...</div>
+          <div class="panel" id="result"></div>
+        </div>
+      `;
 
-      for (let crime in cooldowns) {
-        if (cooldowns[crime] > now) {
-          const secs = Math.ceil((cooldowns[crime] - now) / 1000);
-          document.getElementById(`btn-${crime}`).innerText = `${crime} (${secs}s)`;
-          document.getElementById(`btn-${crime}`).disabled = true;
+      // Crime list (frontend mirrors backend)
+      const crimeTypes = {
+        pickpocket:   { label: "Pickpocket",   minRank: "Street Rat" },
+        shoplift:     { label: "Shoplifting",  minRank: "Errand Boy" },
+        vandalism:    { label: "Vandalism",    minRank: "Associate" },
+        car_theft:    { label: "Car Theft",    minRank: "Muscle" },
+        smuggling:    { label: "Smuggling",    minRank: "Enforcer" },
+        kidnap:       { label: "Kidnap",       minRank: "Caporegime" },
+        blackmail:    { label: "Blackmail",    minRank: "Caporegime" },
+        drug_deal:    { label: "Drug Dealing", minRank: "Underboss" },
+        hijack_truck: { label: "Hijack Truck", minRank: "Underboss" },
+        rob_bank:     { label: "Rob Bank",     minRank: "Consigliere" },
+        arms_deal:    { label: "Arms Deal",    minRank: "Consigliere" },
+        political_hit:{ label: "Political Hit",minRank: "Boss" },
+        legendary_heist:{label: "Legendary Heist", minRank: "Godfather" }
+      };
+
+      const ranks = [
+        "Street Rat","Errand Boy","Associate","Muscle","Enforcer",
+        "Caporegime","Underboss","Consigliere","Boss","Godfather"
+      ];
+
+      // Load player rank to lock/unlock crimes
+      apiGet("/players/me").then(p => {
+        const playerRank = p.rank;
+        let html = `<p>Select a crime to commit. Locked crimes show their required rank.</p>`;
+
+        Object.entries(crimeTypes).forEach(([key, crime]) => {
+          const isUnlocked = ranks.indexOf(playerRank) >= ranks.indexOf(crime.minRank);
+          html += `
+            <button id="btn-${key}" ${isUnlocked ? `onclick="doCrime('${key}')"` : "disabled"}
+              title="${isUnlocked ? "" : "Unlocks at " + crime.minRank}">
+              ${crime.label} ${isUnlocked ? "" : `(${crime.minRank}+)`}
+            </button><br>
+          `;
+        });
+
+        document.getElementById("crimePanel").innerHTML = html;
+
+        // Show admin link if role is admin
+        if (role === "admin" || role === "mod") {
+          document.getElementById("adminLink").style.display = "block";
+        }
+      });
+
+      async function doCrime(type) {
+        const res = await apiPost("/crimes", { type });
+        if (res.error) {
+          document.getElementById("result").innerHTML = `<p style="color:red">${res.error}</p>`;
         } else {
-          if (crime === "hit") document.getElementById("btn-hit").innerText = "💀 Hit (High Risk)";
-          if (crime === "smuggling") document.getElementById("btn-smuggling").innerText = "🚛 Smuggling (Medium Risk)";
-          if (crime === "bribe") document.getElementById("btn-bribe").innerText = "💵 Bribe (Low Risk)";
-          document.getElementById(`btn-${crime}`).disabled = false;
+          document.getElementById("result").innerHTML = `<p>${res.message}</p>`;
         }
       }
-    }
-
-    setInterval(updateCooldowns, 1000);
-
-    async function doCrime(type) {
-      if (!token) return alert("Login first");
-
-      const res = await apiPost("/crimes", { type });
-      if (res.error) {
-        document.getElementById("result").innerHTML = `<p style="color:red">${res.error}</p>`;
-      } else {
-        document.getElementById("result").innerHTML = `<p>${res.message}</p>`;
-
-        // Example cooldowns: hit=10s, smuggling=15s, bribe=5s
-        const cdTimes = { hit: 10000, smuggling: 15000, bribe: 5000 };
-        cooldowns[type] = Date.now() + cdTimes[type];
-      }
-    }
-
-    // Show admin link if role is admin
-    if (role === "admin" || role === "mod") {
-      document.getElementById("adminLink").style.display = "block";
     }
   </script>
 </body>
