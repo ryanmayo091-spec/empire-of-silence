@@ -1,4 +1,4 @@
-// Empire of Silence Backend - Full Version
+// Empire of Silence Backend
 // Node.js + Express + PostgreSQL
 
 const express = require("express");
@@ -66,16 +66,6 @@ const SECRET = process.env.JWT_SECRET || "supersecret";
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
-
-    const propCheck = await pool.query("SELECT COUNT(*) FROM properties");
-    if (parseInt(propCheck.rows[0].count) === 0) {
-      await pool.query(`
-        INSERT INTO properties (name, price) VALUES
-        ('Casino', 10000),
-        ('Bullet Factory', 7500),
-        ('Safehouse', 3000)
-      `);
-    }
 
     console.log("✅ Database seeded and ready");
   } catch (err) {
@@ -172,9 +162,13 @@ app.get("/players/me", authMiddleware, async (req, res) => {
 // Crimes + Jobs
 // ============================
 const crimeTypes = {
-  hit: { cash: -200, respect: 5, heat: 3, jail: 300, successRate: 0.7 },
-  smuggling: { cash: 500, respect: 2, heat: 4, jail: 180, successRate: 0.6 },
-  bribe: { cash: -300, respect: 0, heat: -5, jail: 120, successRate: 0.9 }
+  hit:        { cash: -200,  respect: 5,  heat: 3,  jail: 300,  successRate: 0.7 },
+  smuggling:  { cash: 500,   respect: 2,  heat: 4,  jail: 180,  successRate: 0.6 },
+  bribe:      { cash: -300,  respect: 0,  heat: -5, jail: 120,  successRate: 0.9 },
+  steal_car:  { cash: 800,   respect: 3,  heat: 5,  jail: 600,  successRate: 0.5 },
+  rob_bank:   { cash: 5000,  respect: 10, heat: 15, jail: 1800, successRate: 0.2 },
+  kidnap:     { cash: 2000,  respect: 7,  heat: 8,  jail: 1200, successRate: 0.35 },
+  blackmail:  { cash: 1200,  respect: 6,  heat: 6,  jail: 800,  successRate: 0.45 }
 };
 
 app.post("/crimes", authMiddleware, async (req, res) => {
@@ -200,14 +194,14 @@ app.post("/crimes", authMiddleware, async (req, res) => {
       "UPDATE players SET cash = cash + $1, respect = respect + $2, heat = heat + $3 WHERE id = $4",
       [crime.cash, crime.respect, crime.heat, player.id]
     );
-    resultMessage = `Success: ${type} completed!`;
+    resultMessage = `✅ Success: ${type} completed!`;
   } else {
     const jailUntil = new Date(Date.now() + crime.jail * 1000);
     await pool.query(
       "UPDATE players SET in_prison_until = $1 WHERE id = $2",
       [jailUntil, player.id]
     );
-    resultMessage = `Failed: You are in prison for ${crime.jail} seconds.`;
+    resultMessage = `❌ Failed: You are in prison for ${crime.jail} seconds.`;
   }
 
   await pool.query(
