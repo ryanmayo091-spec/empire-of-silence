@@ -30,7 +30,6 @@
         </div>
       `;
 
-      // Crime list (frontend mirrors backend)
       const crimeTypes = {
         pickpocket:   { label: "Pickpocket",   minRank: "Street Rat" },
         shoplift:     { label: "Shoplifting",  minRank: "Errand Boy" },
@@ -52,7 +51,7 @@
         "Caporegime","Underboss","Consigliere","Boss","Godfather"
       ];
 
-      // Load player rank to lock/unlock crimes
+      // Load player rank
       apiGet("/players/me").then(p => {
         const playerRank = p.rank;
         let html = `<p>Select a crime to commit. Locked crimes show their required rank.</p>`;
@@ -69,7 +68,6 @@
 
         document.getElementById("crimePanel").innerHTML = html;
 
-        // Show admin link if role is admin
         if (role === "admin" || role === "mod") {
           document.getElementById("adminLink").style.display = "block";
         }
@@ -81,7 +79,15 @@
           document.getElementById("result").innerHTML = `<p style="color:red">${res.error}</p>`;
         } else {
           document.getElementById("result").innerHTML = `<p>${res.message}</p>`;
+          // Optional: refresh stats dynamically
+          refreshStats();
         }
+      }
+
+      // Fetch and update stats on the sidebar/dashboard if needed
+      async function refreshStats() {
+        const p = await apiGet("/players/me");
+        console.log("Updated player:", p); // dev debug
       }
     }
   </script>
