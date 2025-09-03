@@ -329,6 +329,75 @@ app.get("/jobs", (req, res) => res.sendFile(path.join(__dirname, "public/jobs.ht
 app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public/admin.html")));
 
 // ============================
+// Prison System: Bail + Bust
+// ============================
+
+// Bail yourself out
+app.post("/prison/bail", authMiddleware, async (req, res) => {
+  const playerRes = await pool.query("SELECT * FROM players WHERE user_id = $1", [req.user.id]);
+  let player = playerRes.rows[0];
+  if (!player.in_prison_until || new Date(player.in_prison_until) <= new Date()) {
+    return res.status(400).json({ error: "You are not in prison" });
+  }
+
+  const diff = new Date(player.in_prison_until).getTime() - Date.now();
+  const minutesLeft = Math.ceil(diff / 60000);
+  const bailCost = minutesLeft * 100; // $100 per minute
+
+  if (player.cash < bailCost) {
+    return res.status(400).json({ error: `Bail costs $${bailCost}, but you only have $${player.cash}` });
+  }
+
+  await pool.query("UPDATE players SET cash = cash - $1, in_prison_until = NULL WHERE id = $2", [bailCost, player.id]);
+
+  await pool.query(
+    "INSERT INTO jobs (type, player_id, result, prison_start, prison_end) VALUES ($1, $2, $3, $4, $5)",
+    ["bail", player.id, `Bailed out for $${bailCost}`, new Date(), new Date()]
+  );
+
+  res.json({ message: `You paid $${bailCost} bail and are now free.` });
+});
+
+// Bust another player out
+app.post("/prison/bust", authMiddleware, async (req, res) => {
+  const { targetId } = req.body;
+
+  const targetRes = await pool.query("SELECT * FROM players WHERE id = $1", [targetId]);
+  const target = targetRes.rows[0];
+  if (!target || !target.in_prison_until || new Date(target.in_prison_until) <= new Date()) {
+    return res.status(400).json({ error: "That player is not in prison" });
+  }
+
+  const rescuerRes = await pool.query("SELECT * FROM players WHERE user_id = $1", [req.user.id]);
+  const rescuer = rescuerRes.rows[0];
+
+  // Success chance = 20% + 5% per rank level
+  const ranks = ["Street Rat","Errand Boy","Associate","Muscle","Enforcer","Caporegime","Underboss","Consigliere","Boss","Godfather"];
+  const rankIndex = ranks.indexOf(rescuer.rank);
+  const successChance = 0.2 + (rankIndex * 0.05);
+
+  const success = Math.random() < successChance;
+
+  if (success) {
+    await pool.query("UPDATE players SET in_prison_until = NULL WHERE id = $1", [target.id]);
+    await pool.query(
+      "INSERT INTO jobs (type, player_id, result, prison_start, prison_end) VALUES ($1, $2, $3, $4, $5)",
+      ["bust", rescuer.id, `Successfully busted ${target.name} out of prison.`, new Date(), new Date()]
+    );
+    res.json({ message: `You successfully busted ${target.name} out of prison!` });
+  } else {
+    const jailUntil = new Date(Date.now() + 300000); // 5m penalty
+    await pool.query("UPDATE players SET in_prison_until = $1 WHERE id = $2", [jailUntil, rescuer.id]);
+    await pool.query(
+      "INSERT INTO jobs (type, player_id, result, prison_start, prison_end) VALUES ($1, $2, $3, $4, $5)",
+      ["bust_fail", rescuer.id, `Failed to bust ${target.name} out and got jailed yourself.`, new Date(), jailUntil]
+    );
+    res.json({ message: `You failed and got jailed for 5 minutes.` });
+  }
+});
+
+
+// ============================
 // Server Start
 // ============================
 const PORT = process.env.PORT || 3000;
