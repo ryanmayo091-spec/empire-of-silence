@@ -9,13 +9,13 @@
   <div id="app"></div>
 
   <script>
-    // If not logged in → redirect to login
     if (!token) {
+      // Not logged in → go to login
       window.location = "/login";
     } else {
       document.getElementById("app").innerHTML = `
         <div class="sidebar">
-          <h2>Empire 🕶️</h2>
+          <h2>Empire</h2>
           <a href="/">🏠 Home</a>
           <a href="/crimes">💀 Crimes</a>
           <a href="/jobs">📜 Jobs</a>
@@ -29,13 +29,17 @@
         </div>
       `;
 
-      // Load stats
+      // Fetch player info
       apiGet("/players/me").then(p => {
         if (p && p.name) {
+          const xpNextRank = getNextRankXp(p.rank);
           document.getElementById("stats").innerHTML = `
             <strong>${p.name}</strong><br>
             💵 Cash: $${p.cash}<br>
             ⭐ Respect: ${p.respect}<br>
+            📈 XP: ${p.xp} ${xpNextRank ? `/ ${xpNextRank}` : ''}<br>
+            🎖️ Rank: ${p.rank}<br>
+            🏅 Prestige: ${p.prestige}<br>
             🔥 Heat: ${p.heat}<br>
             ${p.in_prison_until ? "⛓️ In prison until: " + new Date(p.in_prison_until).toLocaleString() : ""}
           `;
@@ -44,9 +48,26 @@
         }
       });
 
-      // Show admin link if role is admin
+      // Show admin link if role is admin/mod
       if (role === "admin" || role === "mod") {
         document.getElementById("adminLink").style.display = "block";
+      }
+    }
+
+    // Helper to calculate XP required for next rank
+    function getNextRankXp(rank) {
+      switch(rank) {
+        case "Street Rat": return 100;
+        case "Errand Boy": return 300;
+        case "Associate": return 800;
+        case "Muscle": return 2000;
+        case "Enforcer": return 5000;
+        case "Caporegime": return 15000;
+        case "Underboss": return 40000;
+        case "Consigliere": return 100000;
+        case "Boss": return 250000;
+        case "Godfather": return null; // max rank
+        default: return null;
       }
     }
   </script>
