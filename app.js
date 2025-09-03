@@ -20,10 +20,11 @@ const pool = new Pool({
 const SECRET = process.env.JWT_SECRET || "supersecret";
 
 // ============================
-// Database Auto-Seeding
+// Database Auto-Seeding + Schema Fixes
 // ============================
 (async () => {
   try {
+    // Core tables
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -67,7 +68,12 @@ const SECRET = process.env.JWT_SECRET || "supersecret";
       );
     `);
 
-    console.log("✅ Database seeded and ready");
+    // Schema fixes
+    await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS xp INT DEFAULT 0`);
+    await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS rank TEXT DEFAULT 'Street Rat'`);
+    await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS prestige INT DEFAULT 0`);
+
+    console.log("✅ Database seeded and schema updated");
   } catch (err) {
     console.error("❌ DB Seed Error:", err);
   }
@@ -148,27 +154,50 @@ app.post("/auth/login", async (req, res) => {
 });
 
 // ============================
-// Player Routes
+// Rank + Prestige
 // ============================
-app.get("/players/me", authMiddleware, async (req, res) => {
-  const result = await pool.query(
-    "SELECT * FROM players WHERE user_id = $1",
-    [req.user.id]
-  );
-  res.json(result.rows[0]);
-});
+function getRank(xp) {
+  if (xp < 100) return "Street Rat";
+  if (xp < 300) return "Errand Boy";
+  if (xp < 800) return "Associate";
+  if (xp < 2000) return "Muscle";
+  if (xp < 5000) return "Enforcer";
+  if (xp < 15000) return "Caporegime";
+  if (xp < 40000) return "Underboss";
+  if (xp < 100000) return "Consigliere";
+  if (xp < 250000) return "Boss";
+  return "Godfather";
+}
+
+async function checkPrestige(player) {
+  const requiredXp = 250000 * Math.pow(2, player.prestige);
+  if (player.rank === "Godfather" && player.xp >= requiredXp) {
+    await pool.query(
+      "UPDATE players SET xp = 0, rank = 'Street Rat', prestige = prestige + 1 WHERE id = $1",
+      [player.id]
+    );
+    return true;
+  }
+  return false;
+}
 
 // ============================
-// Crimes + Jobs
+// Crimes
 // ============================
 const crimeTypes = {
-  hit:        { cash: -200,  respect: 5,  heat: 3,  jail: 300,  successRate: 0.7 },
-  smuggling:  { cash: 500,   respect: 2,  heat: 4,  jail: 180,  successRate: 0.6 },
-  bribe:      { cash: -300,  respect: 0,  heat: -5, jail: 120,  successRate: 0.9 },
-  steal_car:  { cash: 800,   respect: 3,  heat: 5,  jail: 600,  successRate: 0.5 },
-  rob_bank:   { cash: 5000,  respect: 10, heat: 15, jail: 1800, successRate: 0.2 },
-  kidnap:     { cash: 2000,  respect: 7,  heat: 8,  jail: 1200, successRate: 0.35 },
-  blackmail:  { cash: 1200,  respect: 6,  heat: 6,  jail: 800,  successRate: 0.45 }
+  pickpocket:   { minRank: "Street Rat", xp: 5,  cash: [20, 50],    heat: 1,  jail: 30,   successRate: 0.8 },
+  shoplift:     { minRank: "Errand Boy", xp: 8,  cash: [50, 120],   heat: 2,  jail: 60,   successRate: 0.75 },
+  vandalism:    { minRank: "Associate",  xp: 10, cash: [80, 150],   heat: 3,  jail: 120,  successRate: 0.7 },
+  car_theft:    { minRank: "Muscle",     xp: 20, cash: [300, 1000], heat: 4,  jail: 300,  successRate: 0.55 },
+  smuggling:    { minRank: "Enforcer",   xp: 25, cash: [500, 1500], heat: 5,  jail: 600,  successRate: 0.6 },
+  kidnap:       { minRank: "Caporegime", xp: 50, cash: [2000, 5000],heat: 8,  jail: 1200, successRate: 0.4 },
+  blackmail:    { minRank: "Caporegime", xp: 40, cash: [1500, 4000],heat: 7,  jail: 900,  successRate: 0.45 },
+  drug_deal:    { minRank: "Underboss",  xp: 60, cash: [3000, 7000],heat: 10, jail: 1800, successRate: 0.5 },
+  hijack_truck: { minRank: "Underboss",  xp: 90, cash: [6000, 12000],heat: 12,jail: 2700, successRate: 0.3 },
+  rob_bank:     { minRank: "Consigliere",xp: 120,cash: [10000, 25000],heat: 15,jail: 3600,successRate: 0.2 },
+  arms_deal:    { minRank: "Consigliere",xp: 150,cash: [10000, 30000],heat: 20,jail: 7200,successRate: 0.25 },
+  political_hit:{ minRank: "Boss",       xp: 200,cash: [50000, 100000],heat: 25,jail: 10800,successRate: 0.1 },
+  legendary_heist:{minRank: "Godfather", xp: 500,cash: [200000, 500000],heat: 50,jail: 21600,successRate: 0.05 }
 };
 
 app.post("/crimes", authMiddleware, async (req, res) => {
@@ -176,48 +205,69 @@ app.post("/crimes", authMiddleware, async (req, res) => {
   const crime = crimeTypes[type];
   if (!crime) return res.status(400).json({ error: "Invalid crime type" });
 
-  const playerRes = await pool.query(
-    "SELECT * FROM players WHERE user_id = $1",
-    [req.user.id]
-  );
-  const player = playerRes.rows[0];
+  const playerRes = await pool.query("SELECT * FROM players WHERE user_id = $1", [req.user.id]);
+  let player = playerRes.rows[0];
 
+  // Check rank unlock
+  const playerRank = getRank(player.xp);
+  const ranks = [
+    "Street Rat","Errand Boy","Associate","Muscle","Enforcer",
+    "Caporegime","Underboss","Consigliere","Boss","Godfather"
+  ];
+  if (ranks.indexOf(playerRank) < ranks.indexOf(crime.minRank)) {
+    return res.status(403).json({ error: `You must be at least ${crime.minRank} to attempt this crime.` });
+  }
+
+  // Prison check
   if (player.in_prison_until && new Date(player.in_prison_until) > new Date()) {
     return res.status(403).json({ error: "You are in prison" });
   }
 
-  const success = Math.random() < crime.successRate;
-  let resultMessage = "";
+  // Success/fail with prestige bonus
+  const prestigeBonus = 1 + (player.prestige * 0.05);
+  const successChance = crime.successRate * prestigeBonus;
+  const success = Math.random() < successChance;
+  let resultMessage;
 
   if (success) {
+    const reward = Math.floor(Math.random() * (crime.cash[1] - crime.cash[0] + 1)) + crime.cash[0];
     await pool.query(
-      "UPDATE players SET cash = cash + $1, respect = respect + $2, heat = heat + $3 WHERE id = $4",
-      [crime.cash, crime.respect, crime.heat, player.id]
+      "UPDATE players SET cash = cash + $1, xp = xp + $2, heat = heat + $3 WHERE id = $4",
+      [reward, crime.xp, crime.heat, player.id]
     );
-    resultMessage = `✅ Success: ${type} completed!`;
+    resultMessage = `✅ Success! You earned $${reward} and ${crime.xp} XP.`;
   } else {
     const jailUntil = new Date(Date.now() + crime.jail * 1000);
-    await pool.query(
-      "UPDATE players SET in_prison_until = $1 WHERE id = $2",
-      [jailUntil, player.id]
-    );
-    resultMessage = `❌ Failed: You are in prison for ${crime.jail} seconds.`;
+    await pool.query("UPDATE players SET in_prison_until = $1 WHERE id = $2", [jailUntil, player.id]);
+    resultMessage = `❌ Failed! You are in prison for ${crime.jail/60} minutes.`;
   }
 
-  await pool.query(
-    "INSERT INTO jobs (type, player_id, result) VALUES ($1, $2, $3)",
-    [type, player.id, resultMessage]
-  );
+  // Update rank + prestige
+  const updated = await pool.query("SELECT * FROM players WHERE id = $1", [player.id]);
+  player = updated.rows[0];
+  const newRank = getRank(player.xp);
+  if (newRank !== player.rank) {
+    await pool.query("UPDATE players SET rank = $1 WHERE id = $2", [newRank, player.id]);
+    resultMessage += ` You are now ranked: ${newRank}.`;
+  }
+
+  const prestiged = await checkPrestige(player);
+  if (prestiged) {
+    resultMessage += ` 🎖️ You have Prestiged! Prestige level is now ${player.prestige + 1}.`;
+  }
+
+  // Log job
+  await pool.query("INSERT INTO jobs (type, player_id, result) VALUES ($1, $2, $3)", [type, player.id, resultMessage]);
 
   res.json({ message: resultMessage });
 });
 
-app.get("/jobs", authMiddleware, async (req, res) => {
-  const result = await pool.query(
-    "SELECT * FROM jobs WHERE player_id IN (SELECT id FROM players WHERE user_id = $1) ORDER BY created_at DESC LIMIT 20",
-    [req.user.id]
-  );
-  res.json(result.rows);
+// ============================
+// Player Routes
+// ============================
+app.get("/players/me", authMiddleware, async (req, res) => {
+  const result = await pool.query("SELECT * FROM players WHERE user_id = $1", [req.user.id]);
+  res.json(result.rows[0]);
 });
 
 // ============================
@@ -230,19 +280,13 @@ app.get("/admin/players", authMiddleware, adminMiddleware, async (req, res) => {
 
 app.post("/admin/ban", authMiddleware, adminMiddleware, async (req, res) => {
   const { userId, banned } = req.body;
-  await pool.query("UPDATE users SET banned = $1 WHERE id = $2", [
-    banned,
-    userId
-  ]);
+  await pool.query("UPDATE users SET banned = $1 WHERE id = $2", [banned, userId]);
   res.json({ message: `User ${banned ? "banned" : "unbanned"}` });
 });
 
 app.post("/admin/cash", authMiddleware, adminMiddleware, async (req, res) => {
   const { playerId, amount } = req.body;
-  await pool.query("UPDATE players SET cash = cash + $1 WHERE id = $2", [
-    amount,
-    playerId
-  ]);
+  await pool.query("UPDATE players SET cash = cash + $1 WHERE id = $2", [amount, playerId]);
   res.json({ message: "Cash updated" });
 });
 
@@ -266,6 +310,4 @@ app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public/admin.
 // Server Start
 // ============================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log(`Empire of Silence backend running on port ${PORT}`)
-);
+app.listen(PORT, () => console.log(`Empire of Silence backend running on port ${PORT}`));
