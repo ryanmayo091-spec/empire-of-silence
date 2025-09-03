@@ -1,104 +1,133 @@
-/* Mafia Dark Theme */
-
+/* ===== Global Layout ===== */
 body {
-  background: url("assets/bg.jpg") no-repeat center center fixed;
-  background-size: cover;
-  color: #eee;
-  font-family: 'Segoe UI', Tahoma, sans-serif;
   margin: 0;
+  font-family: Arial, sans-serif;
+  background: #1b1b1b;
+  color: #f0f0f0;
 }
 
-/* Sidebar */
+a {
+  color: #f0f0f0;
+  text-decoration: none;
+}
+
+h1, h2, h3 {
+  margin: 0 0 10px;
+}
+
+/* ===== Sidebar ===== */
 .sidebar {
   position: fixed;
-  left: 0; top: 0; bottom: 0;
-  width: 220px;
-  background: rgba(10, 0, 0, 0.95);
-  padding: 20px 0;
-  overflow-y: auto;
-  box-shadow: 3px 0 6px rgba(0,0,0,0.7);
+  top: 0;
+  left: 0;
+  width: 200px;
+  height: 100%;
+  background: #111;
+  padding: 20px;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.7);
 }
 
 .sidebar h2 {
-  color: crimson;
-  text-align: center;
-  font-family: 'Georgia', serif;
-  margin-bottom: 30px;
-  text-shadow: 0 0 6px darkred;
+  margin-bottom: 20px;
+  color: #e63946;
 }
 
 .sidebar a {
   display: block;
-  color: #ccc;
-  padding: 12px 20px;
-  text-decoration: none;
-  font-size: 16px;
-  transition: 0.2s;
+  margin: 10px 0;
+  padding: 8px;
+  background: #222;
+  border-radius: 5px;
+  transition: background 0.2s;
 }
 
 .sidebar a:hover {
-  background: crimson;
-  color: #fff;
-  text-shadow: 0 0 8px white;
+  background: #333;
 }
 
-/* Content */
+/* ===== Main Content ===== */
 .content {
-  margin-left: 240px;
+  margin-left: 220px;
   padding: 20px;
 }
 
-h1 {
-  color: #fff;
-  text-shadow: 0 0 8px crimson;
-}
-
-/* Panels */
 .panel {
-  background: rgba(30, 0, 0, 0.85);
-  padding: 20px;
+  background: #2c2c2c;
+  padding: 15px;
+  margin-bottom: 15px;
   border-radius: 8px;
-  margin-bottom: 20px;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.6);
-  border: 1px solid crimson;
+  border: 1px solid #444;
 }
 
-/* Buttons */
+/* ===== Buttons ===== */
 button {
-  background: crimson;
-  color: white;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 4px;
-  cursor: pointer;
+  padding: 8px 14px;
   margin: 5px 0;
+  background: #e63946;
+  border: none;
+  border-radius: 5px;
+  color: white;
   font-weight: bold;
-  transition: 0.2s;
+  cursor: pointer;
+  transition: background 0.2s;
 }
 
 button:hover {
-  background: darkred;
-  box-shadow: 0 0 8px crimson;
+  background: #c92c3b;
 }
 
-/* Inputs */
-input, select {
+button:disabled {
+  background: #555;
+  color: #aaa;
+  cursor: not-allowed;
+}
+
+button.crime-btn:disabled {
+  background: #555;
+  color: #aaa;
+  cursor: not-allowed;
+}
+
+/* ===== Feedback Messages ===== */
+.crime-success {
+  color: #28a745; /* Green */
+  font-weight: bold;
+}
+
+.crime-fail {
+  color: #dc3545; /* Red */
+  font-weight: bold;
+}
+
+.crime-rankup {
+  color: #ffc107; /* Gold */
+  font-weight: bold;
+}
+
+.crime-prestige {
+  color: #6f42c1; /* Purple */
+  font-weight: bold;
+}
+
+.crime-info {
+  color: #17a2b8; /* Blue */
+}
+
+/* ===== Prison Styles ===== */
+.prison-banner {
+  background: #111;
+  border: 2px solid #dc3545;
+  color: #dc3545;
+  font-weight: bold;
   padding: 10px;
-  margin: 8px 0;
-  width: 100%;
-  border: none;
-  border-radius: 4px;
-  background: #222;
-  color: white;
-  font-size: 14px;
+  text-align: center;
+  margin-top: 10px;
 }
 
-/* Tables */
 table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 10px;
-  color: white;
 }
 
 table th, table td {
@@ -108,24 +137,5 @@ table th, table td {
 }
 
 table th {
-  background: #222;
-  color: crimson;
-}
-
-/* Prison highlight */
-.prison {
-  color: orange;
-  font-weight: bold;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #111;
-}
-::-webkit-scrollbar-thumb {
-  background: crimson;
-  border-radius: 4px;
+  background: #333;
 }
