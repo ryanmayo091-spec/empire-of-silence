@@ -24,7 +24,6 @@ const SECRET = process.env.JWT_SECRET || "supersecret";
 // ============================
 (async () => {
   try {
-    // Core tables
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -50,6 +49,9 @@ const SECRET = process.env.JWT_SECRET || "supersecret";
         type TEXT NOT NULL,
         player_id INT REFERENCES players(id),
         result TEXT,
+        xp_at_time INT,
+        rank_at_time TEXT,
+        prestige_at_time INT,
         created_at TIMESTAMP DEFAULT NOW()
       );
 
@@ -68,10 +70,14 @@ const SECRET = process.env.JWT_SECRET || "supersecret";
       );
     `);
 
-    // Schema fixes
+    // Add missing columns
     await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS xp INT DEFAULT 0`);
     await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS rank TEXT DEFAULT 'Street Rat'`);
     await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS prestige INT DEFAULT 0`);
+
+    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS xp_at_time INT`);
+    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS rank_at_time TEXT`);
+    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS prestige_at_time INT`);
 
     console.log("✅ Database seeded and schema updated");
   } catch (err) {
@@ -154,7 +160,18 @@ app.post("/auth/login", async (req, res) => {
 });
 
 // ============================
-// Rank + Prestige
+// Player Routes
+// ============================
+app.get("/players/me", authMiddleware, async (req, res) => {
+  const result = await pool.query(
+    "SELECT * FROM players WHERE user_id = $1",
+    [req.user.id]
+  );
+  res.json(result.rows[0]);
+});
+
+// ============================
+// Crimes + Ranking + Prestige
 // ============================
 function getRank(xp) {
   if (xp < 100) return "Street Rat";
@@ -170,7 +187,7 @@ function getRank(xp) {
 }
 
 async function checkPrestige(player) {
-  const requiredXp = 250000 * Math.pow(2, player.prestige);
+  const requiredXp = 250000 * Math.pow(2, player.prestige); // doubles per prestige
   if (player.rank === "Godfather" && player.xp >= requiredXp) {
     await pool.query(
       "UPDATE players SET xp = 0, rank = 'Street Rat', prestige = prestige + 1 WHERE id = $1",
@@ -181,9 +198,6 @@ async function checkPrestige(player) {
   return false;
 }
 
-// ============================
-// Crimes
-// ============================
 const crimeTypes = {
   pickpocket:   { minRank: "Street Rat", xp: 5,  cash: [20, 50],    heat: 1,  jail: 30,   successRate: 0.8 },
   shoplift:     { minRank: "Errand Boy", xp: 8,  cash: [50, 120],   heat: 2,  jail: 60,   successRate: 0.75 },
@@ -208,7 +222,7 @@ app.post("/crimes", authMiddleware, async (req, res) => {
   const playerRes = await pool.query("SELECT * FROM players WHERE user_id = $1", [req.user.id]);
   let player = playerRes.rows[0];
 
-  // Check rank unlock
+  // Rank check
   const playerRank = getRank(player.xp);
   const ranks = [
     "Street Rat","Errand Boy","Associate","Muscle","Enforcer",
@@ -223,7 +237,7 @@ app.post("/crimes", authMiddleware, async (req, res) => {
     return res.status(403).json({ error: "You are in prison" });
   }
 
-  // Success/fail with prestige bonus
+  // Success/fail
   const prestigeBonus = 1 + (player.prestige * 0.05);
   const successChance = crime.successRate * prestigeBonus;
   const success = Math.random() < successChance;
@@ -239,7 +253,7 @@ app.post("/crimes", authMiddleware, async (req, res) => {
   } else {
     const jailUntil = new Date(Date.now() + crime.jail * 1000);
     await pool.query("UPDATE players SET in_prison_until = $1 WHERE id = $2", [jailUntil, player.id]);
-    resultMessage = `❌ Failed! You are in prison for ${crime.jail/60} minutes.`;
+    resultMessage = `❌ Failed! You are in prison for ${Math.round(crime.jail/60)} minutes.`;
   }
 
   // Update rank + prestige
@@ -256,18 +270,20 @@ app.post("/crimes", authMiddleware, async (req, res) => {
     resultMessage += ` 🎖️ You have Prestiged! Prestige level is now ${player.prestige + 1}.`;
   }
 
-  // Log job
-  await pool.query("INSERT INTO jobs (type, player_id, result) VALUES ($1, $2, $3)", [type, player.id, resultMessage]);
+  await pool.query(
+    "INSERT INTO jobs (type, player_id, result, xp_at_time, rank_at_time, prestige_at_time) VALUES ($1, $2, $3, $4, $5, $6)",
+    [type, player.id, resultMessage, player.xp, player.rank, player.prestige]
+  );
 
   res.json({ message: resultMessage });
 });
 
-// ============================
-// Player Routes
-// ============================
-app.get("/players/me", authMiddleware, async (req, res) => {
-  const result = await pool.query("SELECT * FROM players WHERE user_id = $1", [req.user.id]);
-  res.json(result.rows[0]);
+app.get("/jobs", authMiddleware, async (req, res) => {
+  const result = await pool.query(
+    "SELECT * FROM jobs WHERE player_id IN (SELECT id FROM players WHERE user_id = $1) ORDER BY created_at DESC LIMIT 20",
+    [req.user.id]
+  );
+  res.json(result.rows);
 });
 
 // ============================
@@ -280,13 +296,19 @@ app.get("/admin/players", authMiddleware, adminMiddleware, async (req, res) => {
 
 app.post("/admin/ban", authMiddleware, adminMiddleware, async (req, res) => {
   const { userId, banned } = req.body;
-  await pool.query("UPDATE users SET banned = $1 WHERE id = $2", [banned, userId]);
+  await pool.query("UPDATE users SET banned = $1 WHERE id = $2", [
+    banned,
+    userId
+  ]);
   res.json({ message: `User ${banned ? "banned" : "unbanned"}` });
 });
 
 app.post("/admin/cash", authMiddleware, adminMiddleware, async (req, res) => {
   const { playerId, amount } = req.body;
-  await pool.query("UPDATE players SET cash = cash + $1 WHERE id = $2", [amount, playerId]);
+  await pool.query("UPDATE players SET cash = cash + $1 WHERE id = $2", [
+    amount,
+    playerId
+  ]);
   res.json({ message: "Cash updated" });
 });
 
@@ -310,4 +332,6 @@ app.get("/admin", (req, res) => res.sendFile(path.join(__dirname, "public/admin.
 // Server Start
 // ============================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Empire of Silence backend running on port ${PORT}`));
+app.listen(PORT, () =>
+  console.log(`Empire of Silence backend running on port ${PORT}`)
+);
