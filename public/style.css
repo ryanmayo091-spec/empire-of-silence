@@ -82,48 +82,54 @@ button:disabled {
   cursor: not-allowed;
 }
 
-button.crime-btn:disabled {
-  background: #555;
-  color: #aaa;
+/* ===== Crimes Page ===== */
+.crime-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.crime-card {
+  background: #2c2c2c;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 15px;
+  text-align: center;
+  transition: transform 0.2s, background 0.2s;
+  cursor: pointer;
+  font-weight: bold;
+  color: #eee;
+}
+
+.crime-card:hover {
+  background: #383838;
+  transform: scale(1.02);
+}
+
+.crime-card.locked {
+  background: #1a1a1a;
+  color: #777;
+  border: 1px solid #333;
   cursor: not-allowed;
 }
 
-/* ===== Feedback Messages ===== */
-.crime-success {
-  color: #28a745; /* Green */
+/* ===== Crime Result Messages ===== */
+#result {
+  margin-top: 20px;
+  padding: 15px;
+  border-radius: 8px;
   font-weight: bold;
+  display: none;
 }
 
-.crime-fail {
-  color: #dc3545; /* Red */
-  font-weight: bold;
-}
+.crime-success { background: #133d13; color: #00ff00; }
+.crime-fail { background: #3d1313; color: #ff4444; }
+.crime-rankup { background: #3d3613; color: #ffd700; }
+.crime-prestige { background: #29133d; color: #d793ff; }
+.crime-info { background: #222; color: #eee; }
 
-.crime-rankup {
-  color: #ffc107; /* Gold */
-  font-weight: bold;
-}
-
-.crime-prestige {
-  color: #6f42c1; /* Purple */
-  font-weight: bold;
-}
-
-.crime-info {
-  color: #17a2b8; /* Blue */
-}
-
-/* ===== Prison Styles ===== */
-.prison-banner {
-  background: #111;
-  border: 2px solid #dc3545;
-  color: #dc3545;
-  font-weight: bold;
-  padding: 10px;
-  text-align: center;
-  margin-top: 10px;
-}
-
+/* ===== Prison Page ===== */
 table {
   width: 100%;
   border-collapse: collapse;
@@ -138,4 +144,14 @@ table th, table td {
 
 table th {
   background: #333;
+}
+
+.prison-banner {
+  background: #111;
+  border: 2px solid #dc3545;
+  color: #dc3545;
+  font-weight: bold;
+  padding: 10px;
+  text-align: center;
+  margin-top: 10px;
 }
