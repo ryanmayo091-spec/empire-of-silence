@@ -4,26 +4,32 @@
   <title>Empire of Silence - Dashboard</title>
   <link rel="stylesheet" href="style.css">
   <script src="common.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-  <div class="sidebar">
-    <h2>Empire 🕶️</h2>
-    <a href="/">🏠 Home</a>
-    <a href="/crimes">💀 Crimes</a>
-    <a href="/jobs">📜 Jobs</a>
-    <a href="/login">🔑 Login</a>
-    <a href="/register">📝 Register</a>
-    <a id="adminLink" href="/admin" style="display:none;">👑 Admin</a>
-  </div>
-
-  <div class="content">
-    <h1>Dashboard</h1>
-    <div class="panel" id="stats">Loading stats...</div>
-  </div>
+  <div id="app"></div>
 
   <script>
-    if (token) {
+    // If not logged in → redirect to login
+    if (!token) {
+      window.location = "/login";
+    } else {
+      document.getElementById("app").innerHTML = `
+        <div class="sidebar">
+          <h2>Empire 🕶️</h2>
+          <a href="/">🏠 Home</a>
+          <a href="/crimes">💀 Crimes</a>
+          <a href="/jobs">📜 Jobs</a>
+          <a href="#" onclick="logout()">🚪 Logout</a>
+          <a id="adminLink" href="/admin" style="display:none;">👑 Admin</a>
+        </div>
+
+        <div class="content">
+          <h1>Dashboard</h1>
+          <div class="panel" id="stats">Loading stats...</div>
+        </div>
+      `;
+
+      // Load stats
       apiGet("/players/me").then(p => {
         if (p && p.name) {
           document.getElementById("stats").innerHTML = `
@@ -34,16 +40,14 @@
             ${p.in_prison_until ? "⛓️ In prison until: " + new Date(p.in_prison_until).toLocaleString() : ""}
           `;
         } else {
-          document.getElementById("stats").innerHTML = "Not logged in.";
+          document.getElementById("stats").innerHTML = "Error loading stats.";
         }
       });
-    } else {
-      document.getElementById("stats").innerHTML = "Not logged in.";
-    }
 
-    // Show admin link if role is admin
-    if (role === "admin" || role === "mod") {
-      document.getElementById("adminLink").style.display = "block";
+      // Show admin link if role is admin
+      if (role === "admin" || role === "mod") {
+        document.getElementById("adminLink").style.display = "block";
+      }
     }
   </script>
 </body>
