@@ -1,4 +1,4 @@
-// Empire of Silence Backend (Full Updated)
+// Empire of Silence Backend (Fully Fixed)
 // Node.js + Express + PostgreSQL
 
 const express = require("express");
@@ -117,7 +117,7 @@ app.post("/auth/register", async (req, res) => {
     return res.status(400).json({ error: "Username and password required" });
   }
 
-  const username = rawUsername.toLowerCase(); // normalized for DB
+  const username = rawUsername.trim().toLowerCase(); // normalized for DB
   const hashed = await bcrypt.hash(password, 10);
 
   try {
@@ -132,7 +132,7 @@ app.post("/auth/register", async (req, res) => {
 
     await pool.query("INSERT INTO players (user_id, name) VALUES ($1, $2)", [
       user.id,
-      rawUsername // keep original casing for display
+      rawUsername.trim() // keep display name with original casing
     ]);
 
     res.json({ message: "Registered successfully", role: user.role });
@@ -144,7 +144,7 @@ app.post("/auth/register", async (req, res) => {
 
 // Login
 app.post("/auth/login", async (req, res) => {
-  const username = req.body.username?.toLowerCase();
+  const username = req.body.username?.trim().toLowerCase();
   const password = req.body.password;
 
   if (!username || !password) {
@@ -190,7 +190,7 @@ app.get("/admin/players", authMiddleware, adminMiddleware, async (req, res) => {
 });
 
 // ============================
-// Crimes (with XP, Ranks, Prestige)
+// Crimes (XP, Ranks, Prestige)
 // ============================
 const crimeTypes = {
   pickpocket: { minRank: "Street Rat", successXP: 5, cashMin: 10, cashMax: 50, jailMinutes: 1 },
