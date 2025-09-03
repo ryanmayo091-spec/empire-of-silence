@@ -10,17 +10,17 @@
 
   <script>
     if (!token) {
-      // Not logged in → send to login
       window.location = "/login";
     } else {
       document.getElementById("app").innerHTML = `
         <div class="sidebar">
           <h2>Empire</h2>
-          <a href="/">🏠 Home</a>
-          <a href="/crimes">💀 Crimes</a>
-          <a href="/jobs">📜 Jobs</a>
-          <a href="#" onclick="logout()">🚪 Logout</a>
-          <a id="adminLink" href="/admin" style="display:none;">👑 Admin</a>
+          <a href="/">Home</a>
+          <a href="/crimes">Crimes</a>
+          <a href="/jobs">Jobs</a>
+          <a href="/prison">Prison</a>
+          <a href="#" onclick="logout()">Logout</a>
+          <a id="adminLink" href="/admin" style="display:none;">Admin</a>
         </div>
 
         <div class="content">
@@ -51,43 +51,98 @@
         "Caporegime","Underboss","Consigliere","Boss","Godfather"
       ];
 
-      // Load player rank
       apiGet("/players/me").then(p => {
-        const playerRank = p.rank;
-        let html = `<p>Select a crime to commit. Locked crimes show their required rank.</p>`;
+        buildCrimeButtons(p.rank);
 
-        Object.entries(crimeTypes).forEach(([key, crime]) => {
-          const isUnlocked = ranks.indexOf(playerRank) >= ranks.indexOf(crime.minRank);
-          html += `
-            <button id="btn-${key}" ${isUnlocked ? `onclick="doCrime('${key}')"` : "disabled"}
-              title="${isUnlocked ? "" : "Unlocks at " + crime.minRank}">
-              ${crime.label} ${isUnlocked ? "" : `(${crime.minRank}+)`}
-            </button><br>
-          `;
-        });
-
-        document.getElementById("crimePanel").innerHTML = html;
+        if (p.in_prison_until) {
+          startPrisonCountdown(new Date(p.in_prison_until).getTime(), p.cash);
+          lockCrimes();
+        }
 
         if (role === "admin" || role === "mod") {
           document.getElementById("adminLink").style.display = "block";
         }
       });
 
+      function buildCrimeButtons(playerRank) {
+        let html = `<p>Select a crime to commit. Locked crimes show their required rank.</p>`;
+        Object.entries(crimeTypes).forEach(([key, crime]) => {
+          const isUnlocked = ranks.indexOf(playerRank) >= ranks.indexOf(crime.minRank);
+          html += `
+            <button class="crime-btn" id="btn-${key}" ${isUnlocked ? `onclick="doCrime('${key}')"` : "disabled"}
+              title="${isUnlocked ? "" : "Unlocks at " + crime.minRank}">
+              ${crime.label} ${isUnlocked ? "" : `(${crime.minRank}+)`}
+            </button><br>
+          `;
+        });
+        document.getElementById("crimePanel").innerHTML = html;
+      }
+
       async function doCrime(type) {
         const res = await apiPost("/crimes", { type });
         if (res.error) {
-          document.getElementById("result").innerHTML = `<p style="color:red">${res.error}</p>`;
+          document.getElementById("result").innerHTML = `<p class="crime-fail">${res.error}</p>`;
         } else {
-          document.getElementById("result").innerHTML = `<p>${res.message}</p>`;
-          // Optional: refresh stats dynamically
-          refreshStats();
+          let cssClass = "crime-info";
+          if (res.message.includes("Success")) cssClass = "crime-success";
+          else if (res.message.includes("Failed")) cssClass = "crime-fail";
+          else if (res.message.includes("ranked")) cssClass = "crime-rankup";
+          else if (res.message.includes("Prestiged")) cssClass = "crime-prestige";
+
+          document.getElementById("result").innerHTML = `<p class="${cssClass}">${res.message}</p>`;
+
+          if (res.message.includes("prison for")) {
+            lockCrimes();
+            const p = await apiGet("/players/me");
+            startPrisonCountdown(new Date(p.in_prison_until).getTime(), p.cash);
+          }
         }
       }
 
-      // Fetch and update stats on the sidebar/dashboard if needed
-      async function refreshStats() {
-        const p = await apiGet("/players/me");
-        console.log("Updated player:", p); // dev debug
+      function lockCrimes() {
+        document.querySelectorAll(".crime-btn").forEach(btn => {
+          btn.disabled = true;
+        });
+      }
+
+      function unlockCrimes() {
+        document.querySelectorAll(".crime-btn").forEach(btn => {
+          if (!btn.title.startsWith("Unlocks")) btn.disabled = false;
+        });
+      }
+
+      function startPrisonCountdown(prisonEnd, cash) {
+        const interval = setInterval(() => {
+          const now = Date.now();
+          const diff = prisonEnd - now;
+
+          if (diff <= 0) {
+            clearInterval(interval);
+            document.getElementById("result").innerHTML = `<p class="crime-success">You are free from prison.</p>`;
+            unlockCrimes();
+          } else {
+            const mins = Math.floor(diff / 60000);
+            const secs = Math.floor((diff % 60000) / 1000);
+            const bailCost = mins * 100;
+
+            document.getElementById("result").innerHTML = `
+              <p class="crime-fail">In prison for ${mins}m ${secs}s...</p>
+              <button onclick="payBail(${bailCost})" ${cash < bailCost ? "disabled" : ""}>
+                Pay Bail ($${bailCost})
+              </button>
+            `;
+          }
+        }, 1000);
+      }
+
+      async function payBail(cost) {
+        const res = await apiPost("/prison/bail", {});
+        if (res.error) {
+          alert(res.error);
+        } else {
+          alert(res.message);
+          location.reload();
+        }
       }
     }
   </script>
