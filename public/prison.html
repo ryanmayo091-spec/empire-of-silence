@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Empire of Silence - Prison</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="common.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    if (!token) {
+      window.location = "/login";
+    } else {
+      document.getElementById("app").innerHTML = `
+        <div class="sidebar">
+          <h2>Empire</h2>
+          <a href="/">Home</a>
+          <a href="/crimes">Crimes</a>
+          <a href="/jobs">Jobs</a>
+          <a href="/prison">Prison</a>
+          <a href="#" onclick="logout()">Logout</a>
+          <a id="adminLink" href="/admin" style="display:none;">Admin</a>
+        </div>
+
+        <div class="content">
+          <h1>Prison</h1>
+          <div class="panel" id="prisonList">Loading prison data...</div>
+        </div>
+      `;
+
+      loadPrison();
+
+      if (role === "admin" || role === "mod") {
+        document.getElementById("adminLink").style.display = "block";
+      }
+    }
+
+    async function loadPrison() {
+      const players = await apiGet("/admin/players"); // reusing admin API
+      let jailed = players.filter(p => p.in_prison_until && new Date(p.in_prison_until) > new Date());
+
+      if (jailed.length === 0) {
+        document.getElementById("prisonList").innerHTML = "<p>No one is in prison right now.</p>";
+        return;
+      }
+
+      let html = "<table><tr><th>Name</th><th>Rank</th><th>Release In</th><th>Action</th></tr>";
+      jailed.forEach(p => {
+        html += `
+          <tr>
+            <td>${p.name}</td>
+            <td>${p.rank}</td>
+            <td><span id="timer-${p.id}"></span></td>
+            <td><button onclick="bustPlayer(${p.id})">Bust Out</button></td>
+          </tr>
+        `;
+        startTimer(p.id, new Date(p.in_prison_until).getTime());
+      });
+      html += "</table>";
+
+      document.getElementById("prisonList").innerHTML = html;
+    }
+
+    function startTimer(id, prisonEnd) {
+      const el = document.getElementById(`timer-${id}`);
+      const interval = setInterval(() => {
+        const now = Date.now();
+        const diff = prisonEnd - now;
+        if (diff <= 0) {
+          clearInterval(interval);
+          el.innerHTML = "Free";
+          loadPrison();
+        } else {
+          const mins = Math.floor(diff / 60000);
+          const secs = Math.floor((diff % 60000) / 1000);
+          el.innerHTML = `${mins}m ${secs}s`;
+        }
+      }, 1000);
+    }
+
+    async function bustPlayer(id) {
+      const res = await apiPost("/prison/bust", { targetId: id });
+      if (res.error) {
+        alert(res.error);
+      } else {
+        alert(res.message);
+        loadPrison();
+      }
+    }
+  </script>
+</body>
+</html>
