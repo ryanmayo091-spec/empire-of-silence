@@ -41,7 +41,10 @@ const SECRET = process.env.JWT_SECRET || "supersecret";
         cash INT DEFAULT 1000,
         respect INT DEFAULT 0,
         heat INT DEFAULT 0,
-        in_prison_until TIMESTAMP DEFAULT NULL
+        in_prison_until TIMESTAMP DEFAULT NULL,
+        xp INT DEFAULT 0,
+        rank TEXT DEFAULT 'Street Rat',
+        prestige INT DEFAULT 0
       );
 
       CREATE TABLE IF NOT EXISTS jobs (
@@ -71,15 +74,6 @@ const SECRET = process.env.JWT_SECRET || "supersecret";
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
-
-    await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS xp INT DEFAULT 0`);
-    await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS rank TEXT DEFAULT 'Street Rat'`);
-    await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS prestige INT DEFAULT 0`);
-    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS xp_at_time INT`);
-    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS rank_at_time TEXT`);
-    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS prestige_at_time INT`);
-    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS prison_start TIMESTAMP`);
-    await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS prison_end TIMESTAMP`);
 
     console.log("✅ Database seeded and schema updated");
   } catch (err) {
@@ -111,10 +105,19 @@ function adminMiddleware(req, res, next) {
 }
 
 // ============================
-// Auth Routes
+// Auth Routes (Fixed)
 // ============================
+
+// Register
 app.post("/auth/register", async (req, res) => {
-  const { username, password } = req.body;
+  const rawUsername = req.body.username;
+  const password = req.body.password;
+
+  if (!rawUsername || !password) {
+    return res.status(400).json({ error: "Username and password required" });
+  }
+
+  const username = rawUsername.toLowerCase(); // normalized for DB
   const hashed = await bcrypt.hash(password, 10);
 
   try {
@@ -129,35 +132,44 @@ app.post("/auth/register", async (req, res) => {
 
     await pool.query("INSERT INTO players (user_id, name) VALUES ($1, $2)", [
       user.id,
-      username
+      rawUsername // keep original casing for display
     ]);
 
     res.json({ message: "Registered successfully", role: user.role });
   } catch (err) {
     console.error(err);
-    res.status(400).json({ error: "Username taken" });
+    res.status(400).json({ error: "Username already exists" });
   }
 });
 
+// Login
 app.post("/auth/login", async (req, res) => {
-  const { username, password } = req.body;
+  const username = req.body.username?.toLowerCase();
+  const password = req.body.password;
+
+  if (!username || !password) {
+    return res.status(400).json({ error: "Username and password required" });
+  }
+
   const result = await pool.query("SELECT * FROM users WHERE username = $1", [
     username
   ]);
   if (result.rows.length === 0)
-    return res.status(401).json({ error: "Invalid credentials" });
+    return res.status(401).json({ error: "Invalid username or password" });
 
   const user = result.rows[0];
   if (user.banned) return res.status(403).json({ error: "You are banned" });
 
   const match = await bcrypt.compare(password, user.password);
-  if (!match) return res.status(401).json({ error: "Invalid credentials" });
+  if (!match)
+    return res.status(401).json({ error: "Invalid username or password" });
 
   const token = jwt.sign(
     { id: user.id, username: user.username, role: user.role },
     SECRET,
     { expiresIn: "2h" }
   );
+
   res.json({ token, role: user.role });
 });
 
@@ -178,15 +190,105 @@ app.get("/admin/players", authMiddleware, adminMiddleware, async (req, res) => {
 });
 
 // ============================
-// Crimes + Ranking + Prestige (shortened here for brevity but includes all crimeTypes)
+// Crimes (with XP, Ranks, Prestige)
 // ============================
-// ... (keep crimes + rank code we built earlier)
+const crimeTypes = {
+  pickpocket: { minRank: "Street Rat", successXP: 5, cashMin: 10, cashMax: 50, jailMinutes: 1 },
+  shoplift: { minRank: "Errand Boy", successXP: 10, cashMin: 20, cashMax: 100, jailMinutes: 2 },
+  vandalism: { minRank: "Associate", successXP: 15, cashMin: 50, cashMax: 200, jailMinutes: 3 },
+  car_theft: { minRank: "Muscle", successXP: 25, cashMin: 200, cashMax: 800, jailMinutes: 5 },
+  smuggling: { minRank: "Enforcer", successXP: 40, cashMin: 500, cashMax: 1500, jailMinutes: 10 },
+  kidnap: { minRank: "Caporegime", successXP: 60, cashMin: 1000, cashMax: 2500, jailMinutes: 15 },
+  blackmail: { minRank: "Caporegime", successXP: 70, cashMin: 1200, cashMax: 3000, jailMinutes: 15 },
+  drug_deal: { minRank: "Underboss", successXP: 90, cashMin: 2000, cashMax: 5000, jailMinutes: 20 },
+  hijack_truck: { minRank: "Underboss", successXP: 120, cashMin: 3000, cashMax: 7000, jailMinutes: 20 },
+  rob_bank: { minRank: "Consigliere", successXP: 200, cashMin: 10000, cashMax: 20000, jailMinutes: 30 },
+  arms_deal: { minRank: "Consigliere", successXP: 250, cashMin: 12000, cashMax: 25000, jailMinutes: 30 },
+  political_hit: { minRank: "Boss", successXP: 500, cashMin: 25000, cashMax: 50000, jailMinutes: 60 },
+  legendary_heist: { minRank: "Godfather", successXP: 1000, cashMin: 50000, cashMax: 100000, jailMinutes: 120 }
+};
+
+const ranks = [
+  { name: "Street Rat", xp: 0 },
+  { name: "Errand Boy", xp: 100 },
+  { name: "Associate", xp: 300 },
+  { name: "Muscle", xp: 800 },
+  { name: "Enforcer", xp: 2000 },
+  { name: "Caporegime", xp: 5000 },
+  { name: "Underboss", xp: 15000 },
+  { name: "Consigliere", xp: 40000 },
+  { name: "Boss", xp: 100000 },
+  { name: "Godfather", xp: 250000 }
+];
+
+function getRankByXP(xp) {
+  let rank = "Street Rat";
+  for (const r of ranks) {
+    if (xp >= r.xp) rank = r.name;
+  }
+  return rank;
+}
+
+app.post("/crimes", authMiddleware, async (req, res) => {
+  const { type } = req.body;
+  const crime = crimeTypes[type];
+  if (!crime) return res.status(400).json({ error: "Invalid crime" });
+
+  const playerRes = await pool.query("SELECT * FROM players WHERE user_id = $1", [req.user.id]);
+  let player = playerRes.rows[0];
+
+  if (player.in_prison_until && new Date(player.in_prison_until) > new Date()) {
+    return res.status(403).json({ error: "You are in prison" });
+  }
+
+  const playerRankIndex = ranks.findIndex(r => r.name === player.rank);
+  const crimeRankIndex = ranks.findIndex(r => r.name === crime.minRank);
+  if (playerRankIndex < crimeRankIndex) {
+    return res.status(403).json({ error: `You need to be at least ${crime.minRank} to do this crime` });
+  }
+
+  const success = Math.random() < 0.6;
+  let message;
+
+  if (success) {
+    const cashEarned = Math.floor(Math.random() * (crime.cashMax - crime.cashMin + 1)) + crime.cashMin;
+    const newXP = player.xp + crime.successXP;
+
+    let newRank = getRankByXP(newXP);
+    let prestigeMsg = "";
+    if (newRank === "Godfather" && player.rank === "Godfather") {
+      await pool.query("UPDATE players SET prestige = prestige + 1, xp = 0 WHERE id = $1", [player.id]);
+      prestigeMsg = ` You have Prestiged! Prestige level is now ${player.prestige + 1}.`;
+    } else {
+      await pool.query("UPDATE players SET cash = cash + $1, xp = xp + $2, rank = $3 WHERE id = $4", [
+        cashEarned, crime.successXP, newRank, player.id
+      ]);
+    }
+
+    message = `Success! You earned $${cashEarned} and ${crime.successXP} XP.`;
+    if (newRank !== player.rank) message += ` You are now ranked: ${newRank}.`;
+    if (prestigeMsg) message += prestigeMsg;
+
+    await pool.query("INSERT INTO jobs (type, player_id, result, xp_at_time, rank_at_time, prestige_at_time) VALUES ($1, $2, $3, $4, $5, $6)", [
+      type, player.id, message, newXP, newRank, player.prestige
+    ]);
+  } else {
+    const jailUntil = new Date(Date.now() + crime.jailMinutes * 60000);
+    await pool.query("UPDATE players SET in_prison_until = $1 WHERE id = $2", [jailUntil, player.id]);
+
+    message = `Failed! You are in prison for ${crime.jailMinutes} minutes.`;
+
+    await pool.query("INSERT INTO jobs (type, player_id, result, prison_start, prison_end) VALUES ($1, $2, $3, $4, $5)", [
+      type, player.id, message, new Date(), jailUntil
+    ]);
+  }
+
+  res.json({ message });
+});
 
 // ============================
-// Prison System
+// Prison System: Bail + Bust
 // ============================
-
-// Bail
 app.post("/prison/bail", authMiddleware, async (req, res) => {
   const playerRes = await pool.query("SELECT * FROM players WHERE user_id = $1", [req.user.id]);
   let player = playerRes.rows[0];
@@ -212,7 +314,6 @@ app.post("/prison/bail", authMiddleware, async (req, res) => {
   res.json({ message: `You paid $${bailCost} bail and are now free.` });
 });
 
-// Bust
 app.post("/prison/bust", authMiddleware, async (req, res) => {
   const { targetId } = req.body;
 
@@ -225,8 +326,7 @@ app.post("/prison/bust", authMiddleware, async (req, res) => {
   const rescuerRes = await pool.query("SELECT * FROM players WHERE user_id = $1", [req.user.id]);
   const rescuer = rescuerRes.rows[0];
 
-  const ranks = ["Street Rat","Errand Boy","Associate","Muscle","Enforcer","Caporegime","Underboss","Consigliere","Boss","Godfather"];
-  const rankIndex = ranks.indexOf(rescuer.rank);
+  const rankIndex = ranks.findIndex(r => r.name === rescuer.rank);
   const successChance = 0.2 + (rankIndex * 0.05);
 
   const success = Math.random() < successChance;
