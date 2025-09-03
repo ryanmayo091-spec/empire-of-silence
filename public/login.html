@@ -4,17 +4,8 @@
   <title>Empire of Silence - Login</title>
   <link rel="stylesheet" href="style.css">
   <script src="common.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-  <div class="sidebar">
-    <h2>Empire 🕶️</h2>
-    <a href="/">🏠 Home</a>
-    <a href="/crimes">💀 Crimes</a>
-    <a href="/jobs">📜 Jobs</a>
-    <a href="/register">📝 Register</a>
-  </div>
-
   <div class="content">
     <h1>Login</h1>
     <div class="panel">
@@ -22,9 +13,15 @@
       <input id="pass" type="password" placeholder="Password">
       <button onclick="login()">Login</button>
     </div>
+    <p>Don’t have an account? <a href="/register">Register here</a></p>
   </div>
 
   <script>
+    if (token) {
+      // Already logged in → go to dashboard
+      window.location = "/";
+    }
+
     async function login() {
       const username = document.getElementById("user").value;
       const password = document.getElementById("pass").value;
@@ -38,7 +35,6 @@
       const data = await res.json();
       if (data.token) {
         setSession(data.token, data.role);
-        alert("Login successful!");
         window.location = "/";
       } else {
         alert(data.error);
