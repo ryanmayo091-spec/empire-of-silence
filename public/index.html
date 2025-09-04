@@ -1,74 +1,120 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Empire of Silence - Dashboard</title>
+  <meta charset="UTF-8">
+  <title>Empire of Silence | Dashboard</title>
   <link rel="stylesheet" href="style.css">
   <script src="common.js"></script>
 </head>
 <body>
-  <div id="app"></div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <h2>Empire</h2>
+    <a href="/">🏠 Dashboard</a>
+    <a href="/crimes">💀 Crimes</a>
+    <a href="/jobs">📜 Jobs</a>
+    <a href="/prison">⛓ Prison</a>
+    <a href="/properties">🏢 Properties</a>
+    <a href="/login" onclick="logout()">🚪 Logout</a>
+    <a id="adminLink" href="/admin" style="display:none;">⚖ Admin</a>
+  </div>
+
+  <!-- Main Content -->
+  <div class="content">
+    <h1>Empire of Silence Dashboard</h1>
+
+    <!-- Player Stats -->
+    <div class="panel stats-panel">
+      <h2>Your Stats</h2>
+      <p><strong>Username:</strong> <span id="playerName"></span></p>
+      <p><strong>Cash:</strong> $<span id="playerCash"></span></p>
+      <p><strong>Respect:</strong> <span id="playerRespect"></span></p>
+      <p><strong>XP:</strong> <span id="playerXP"></span></p>
+      <p><strong>Rank:</strong> <span id="playerRank"></span></p>
+      <p><strong>Prestige:</strong> <span id="playerPrestige"></span></p>
+    </div>
+
+    <!-- Prison Status -->
+    <div class="panel prison-status" id="prisonStatus" style="display:none;">
+      <h2>⛓ Prison</h2>
+      <p id="prisonMessage"></p>
+      <p>Time left: <span id="prisonTimer"></span></p>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="panel">
+      <h2>Quick Actions</h2>
+      <div class="quick-actions">
+        <a class="action-btn" href="/crimes">Commit Crimes</a>
+        <a class="action-btn" href="/jobs">Take Jobs</a>
+        <a class="action-btn" href="/properties">View Properties</a>
+      </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="panel">
+      <h2>Recent Activity</h2>
+      <ul id="activityLog"></ul>
+    </div>
+  </div>
 
   <script>
-    if (!token) {
-      window.location = "/login";
-    } else {
-      document.getElementById("app").innerHTML = `
-        <div class="sidebar">
-          <h2>Empire</h2>
-          <a href="/">Home</a>
-          <a href="/crimes">Crimes</a>
-          <a href="/jobs">Jobs</a>
-          <a href="/prison">Prison</a>
-          <a href="#" onclick="logout()">Logout</a>
-          <a id="adminLink" href="/admin" style="display:none;">Admin</a>
-        </div>
+    async function loadDashboard() {
+      try {
+        const player = await apiGet("/players/me");
 
-        <div class="content">
-          <h1>Dashboard</h1>
-          <div class="panel" id="stats">Loading stats...</div>
-        </div>
-      `;
+        document.getElementById("playerName").innerText = player.name;
+        document.getElementById("playerCash").innerText = player.cash;
+        document.getElementById("playerRespect").innerText = player.respect;
+        document.getElementById("playerXP").innerText = player.xp;
+        document.getElementById("playerRank").innerText = player.rank;
+        document.getElementById("playerPrestige").innerText = player.prestige;
 
-      loadStats();
+        // Prison check
+        if (player.in_prison_until) {
+          document.getElementById("prisonStatus").style.display = "block";
+          const prisonEnd = new Date(player.in_prison_until).getTime();
 
-      if (role === "admin" || role === "mod") {
-        document.getElementById("adminLink").style.display = "block";
+          function updateTimer() {
+            const now = new Date().getTime();
+            const diff = prisonEnd - now;
+            if (diff <= 0) {
+              document.getElementById("prisonMessage").innerText = "You are free!";
+              document.getElementById("prisonTimer").innerText = "";
+              clearInterval(interval);
+            } else {
+              const mins = Math.floor(diff / 60000);
+              const secs = Math.floor((diff % 60000) / 1000);
+              document.getElementById("prisonMessage").innerText = "You are in prison.";
+              document.getElementById("prisonTimer").innerText = `${mins}m ${secs}s`;
+            }
+          }
+          updateTimer();
+          const interval = setInterval(updateTimer, 1000);
+        }
+
+        // Activity log
+        const jobs = await apiGet("/jobs");
+        const logList = document.getElementById("activityLog");
+        logList.innerHTML = "";
+        jobs.slice(0, 10).forEach(job => {
+          const li = document.createElement("li");
+          li.innerText = `[${job.created_at}] ${job.type} → ${job.result}`;
+          logList.appendChild(li);
+        });
+
+        // Admin link
+        if (role === "admin") {
+          document.getElementById("adminLink").style.display = "block";
+        }
+      } catch (err) {
+        console.error("Dashboard error:", err);
+        alert(err.error || "Error loading dashboard");
       }
     }
 
-    async function loadStats() {
-      const p = await apiGet("/players/me");
-      if (p && p.name) {
-        const xpNextRank = getNextRankXp(p.rank);
-        document.getElementById("stats").innerHTML = `
-          <strong>${p.name}</strong><br>
-          Cash: $${p.cash}<br>
-          Respect: ${p.respect}<br>
-          XP: ${p.xp} ${xpNextRank ? `/ ${xpNextRank}` : ''}<br>
-          Rank: ${p.rank}<br>
-          Prestige: ${p.prestige}<br>
-          Heat: ${p.heat}
-        `;
-      } else {
-        document.getElementById("stats").innerHTML = "Error loading stats.";
-      }
-    }
-
-    function getNextRankXp(rank) {
-      switch(rank) {
-        case "Street Rat": return 100;
-        case "Errand Boy": return 300;
-        case "Associate": return 800;
-        case "Muscle": return 2000;
-        case "Enforcer": return 5000;
-        case "Caporegime": return 15000;
-        case "Underboss": return 40000;
-        case "Consigliere": return 100000;
-        case "Boss": return 250000;
-        case "Godfather": return null;
-        default: return null;
-      }
-    }
+    loadDashboard();
   </script>
 </body>
 </html>
