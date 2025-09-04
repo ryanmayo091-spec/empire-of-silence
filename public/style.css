@@ -155,3 +155,181 @@ table th {
   text-align: center;
   margin-top: 10px;
 }
+
+/* ===== Login & Register Pages (Empire Style) ===== */
+body.login-page, body.register-page {
+  background: url("images/empire-bg.jpg") no-repeat center center fixed;
+  background-size: cover;
+  color: #f0f0f0;
+  margin: 0;
+  padding: 0;
+}
+
+.banner {
+  text-align: center;
+  padding: 40px 0 10px;
+  background: rgba(0,0,0,0.8);
+  border-bottom: 3px solid #e63946;
+}
+
+.banner h1 {
+  font-size: 3em;
+  margin: 0;
+  color: #e63946;
+  letter-spacing: 4px;
+  font-family: "Cinzel", serif; /* mafia-style font */
+}
+
+.banner .tagline {
+  font-size: 1.1em;
+  color: #ccc;
+  margin-top: 5px;
+}
+
+.navbar {
+  display: flex;
+  justify-content: center;
+  background: #111;
+  padding: 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+}
+
+.navbar a {
+  margin: 0 15px;
+  color: #eee;
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 0.9em;
+  transition: color 0.2s;
+}
+
+.navbar a:hover {
+  color: #e63946;
+}
+
+.main-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 40px;
+  margin: 40px;
+}
+
+.login-box, .info-box, .register-box {
+  background: rgba(0,0,0,0.85);
+  padding: 25px;
+  border-radius: 12px;
+  width: 320px;
+  box-shadow: 0 0 20px rgba(0,0,0,0.8);
+}
+
+.login-box h2, .register-box h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #e63946;
+}
+
+.login-box input, .register-box input {
+  display: block;
+  width: 100%;
+  margin: 12px 0;
+  padding: 12px;
+  border-radius: 6px;
+  border: none;
+  background: #222;
+  color: #fff;
+  font-size: 1em;
+}
+
+.login-box input:focus, .register-box input:focus {
+  outline: 2px solid #e63946;
+}
+
+.login-box button, .register-box button {
+  width: 100%;
+  padding: 12px;
+  background: #e63946;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-weight: bold;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.login-box button:hover, .register-box button:hover {
+  background: #c92c3b;
+  transform: scale(1.02);
+}
+
+.register-link {
+  margin-top: 15px;
+  text-align: center;
+  font-size: 0.9em;
+}
+
+.info-box h3 {
+  color: #e63946;
+  margin-bottom: 10px;
+}
+
+.info-box ul {
+  padding-left: 20px;
+}
+
+.info-box ul li {
+  margin: 5px 0;
+}
+
+.stats {
+  margin: 12px 0;
+  font-weight: bold;
+  color: #ffd700;
+}
+
+/* ===== Dashboard ===== */
+.stats-panel p {
+  margin: 6px 0;
+  font-size: 1.1em;
+}
+
+.prison-status {
+  border: 2px solid #dc3545;
+  color: #ff5555;
+  text-align: center;
+}
+
+.quick-actions {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  flex: 1;
+  text-align: center;
+  padding: 12px;
+  background: #e63946;
+  border-radius: 6px;
+  font-weight: bold;
+  color: white;
+  text-transform: uppercase;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.action-btn:hover {
+  background: #c92c3b;
+  transform: scale(1.05);
+}
+
+#activityLog {
+  list-style: none;
+  padding: 0;
+}
+
+#activityLog li {
+  padding: 6px 0;
+  border-bottom: 1px solid #444;
+  font-size: 0.95em;
+}
